@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chamados em Andamento — Aurora Desk</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="mock-data.js"></script>
+  <script src="mock-firebase.js"></script>
+  <script src="app-comum.js"></script>
+  <style>
+    /* Tokens (:root) e reset agora vêm de estilo.css */
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══ HEADER ═══════════════════════════════════════════ */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo { height: 38px; width: auto; object-fit: contain; flex-shrink: 0; }
+    .header-titulo { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+
+    .sync-status {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .sync-status.online { background: rgba(39,174,96,0.2); color: var(--ok); }
+    .sync-status.offline { background: rgba(233,69,96,0.2); color: var(--accent); }
+    .sync-status.syncing { background: rgba(52,152,219,0.2); color: var(--pend); }
+
+    .spacer { flex: 1; }
+
+    .btn {
+      padding: 7px 14px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+
+    /* ═══ CONTEÚDO ══════════════════════════════════════════ */
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+
+    .secao-titulo {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .secao-titulo .qtd {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      padding: 1px 9px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* ═══ CARROSSEL ══════════════════════════════════════════ */
+    .carousel {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    .viewport {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .track {
+      display: flex;
+      transition: transform 0.35s ease, height 0.35s ease;
+      will-change: transform, height;
+    }
+
+    .slide {
+      flex: 0 0 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      padding: 2px 6px;
+    }
+
+    .nav-btn {
+      flex-shrink: 0;
+      width: 46px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 1.3rem;
+      line-height: 1;
+      transition: background 0.2s;
+      align-self: center;
+    }
+    .nav-btn:hover { background: var(--accent); color: #fff; }
+    .nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .nav-btn:disabled:hover { background: var(--bg-input); color: var(--text); }
+
+    .contador {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    /* ═══ POST ══════════════════════════════════════════════ */
+    .post {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 320px;
+    }
+
+    .post-topo {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 3px 12px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+    .badge-em_andamento { background: var(--pend); }
+    .badge-validacao_cliente { background: var(--val); color: #1a1a2e; }
+    .badge-concluido { background: var(--ok); }
+    .badge-registro_ligacao { background: var(--reg); color: #1a1a2e; }
+
+    .post-data { font-size: 0.72rem; color: var(--text-muted); }
+
+    .post-titulo { font-size: 1.25rem; font-weight: 700; word-wrap: break-word; }
+
+    .post-texto { font-size: 0.92rem; color: var(--text); }
+    .post-texto p { margin-bottom: 10px; }
+    .post-texto p:last-child { margin-bottom: 0; }
+
+    .post-links { display: flex; flex-direction: column; gap: 6px; }
+    .post-links .link-item {
+      color: var(--pend);
+      text-decoration: none;
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
+    .post-links .link-item:hover { text-decoration: underline; }
+    .post-queries { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .post-queries-titulo { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+    .query-item { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); overflow: hidden; }
+    .query-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 12px; border-bottom: 1px solid var(--border); box-sizing: border-box; }
+    .query-head-spacer { flex: 1; }
+    .query-resumo { font-size: 0.82rem; color: var(--text); word-break: break-word; }
+    .btn-copy-query {
+      flex: 0 0 auto; background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--text-muted); border-radius: 6px; cursor: pointer;
+      font-size: 0.75rem; padding: 3px 10px;
+    }
+    .btn-copy-query:hover { color: var(--text); border-color: var(--accent); }
+    .query-code {
+      margin: 0; padding: 10px 12px; overflow-x: auto;
+      font-family: Consolas, 'Courier New', monospace; font-size: 0.8rem;
+      color: #d6e4f0; background: var(--bg-input); line-height: 1.5; white-space: pre;
+    }
+
+    .post-imgs { display: flex; gap: 10px; flex-wrap: wrap; }
+    .post-imgs img {
+      width: 210px;
+      height: 140px;
+      object-fit: contain;
+      background: #06060a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .post-imgs img:hover { transform: scale(1.03); }
+
+    .post-acoes {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+    }
+    .post-acoes .btn { font-size: 0.78rem; padding: 5px 12px; }
+
+    .status-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      margin-top: 2px;
+    }
+    .status-bar .sbtn {
+      flex: 1;
+      min-width: 120px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+    .status-bar .sbtn:hover { color: var(--text); border-color: var(--text-muted); }
+    .status-bar .sbtn:disabled { cursor: default; opacity: 0.75; }
+    .status-bar .sbtn.selecionado-em_andamento { background: rgba(52,152,219,0.25); border-color: var(--pend); color: #fff; }
+    .status-bar .sbtn.selecionado-validacao_cliente { background: rgba(245,166,35,0.25); border-color: var(--val); color: #fff; }
+    .status-bar .sbtn.selecionado-concluido { background: rgba(39,174,96,0.25); border-color: var(--ok); color: #fff; }
+
+    .vazio {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 48px 20px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      display: none;
+    }
+    .vazio.ativo { display: block; }
+    .vazio .btn { margin-top: 16px; }
+
+    /* ═══ MODAL ═════════════════════════════════════════════ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+      overflow-y: auto;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 620px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal h2 { font-size: 1.15rem; }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 120px; }
+
+    .linhas-links { display: flex; flex-direction: column; gap: 8px; }
+    .linha-link { display: flex; gap: 8px; }
+    .linha-link input { flex: 1; }
+    .linha-link input:first-child { flex: 0 0 30%; }
+    .linha-link button {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0 12px;
+      font-size: 0.9rem;
+    }
+    .btn-lite {
+      background: var(--bg-input);
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      padding: 7px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .btn-lite:hover { color: var(--text); border-color: var(--accent); }
+
+    #grupo-ligacao .bloco { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    #grupo-ligacao .bloco:last-child { margin-bottom: 0; }
+
+    .linhas-queries { display: flex; flex-direction: column; gap: 10px; }
+    .linha-query {
+      display: flex; flex-direction: column; gap: 6px;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; background: var(--bg-card);
+    }
+    .linha-query-topo { display: flex; gap: 8px; align-items: center; }
+    .linha-query-topo input { flex: 1; }
+    .linha-query textarea { min-height: 64px; font-family: Consolas, 'Courier New', monospace; font-size: 0.82rem; resize: vertical; }
+    .linha-query .btn-remove-query {
+      background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--accent); border-radius: 6px; cursor: pointer;
+      padding: 4px 10px; font-size: 0.8rem; white-space: nowrap;
+    }
+
+    .image-upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 6px;
+      padding: 18px;
+      text-align: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .image-upload-area:hover { border-color: var(--accent); background: rgba(233,69,96,0.05); }
+    .image-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+    .image-preview-container { display: flex; gap: 8px; flex-wrap: wrap; }
+    .image-preview-item { position: relative; }
+    .image-preview-item img { max-width: 100px; max-height: 75px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; }
+    .image-preview-item button {
+      position: absolute; top: -6px; right: -6px;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 50%; width: 18px; height: 18px;
+      cursor: pointer; font-size: 0.65rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ═══ LIGHTBOX ══════════════════════════════════════════ */
+    .lightbox {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 300;
+      justify-content: center; align-items: center;
+      cursor: pointer;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      object-fit: contain;
+      transform-origin: 50% 50%;
+      user-select: none;
+      -webkit-user-select: none;
+      will-change: transform;
+      transition: none;
+    }
+    .lightbox-controls {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      background: rgba(10,10,14,0.8);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      z-index: 5;
+    }
+    .lightbox-controls button {
+      background: #23232c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-size: 1.05rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox-controls button:hover { background: var(--accent); }
+    .lightbox-controls button:disabled { opacity: 0.35; cursor: default; }
+    .lightbox-controls button:disabled:hover { background: #23232c; }
+    .lightbox-hint {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.55);
+      font-size: 0.72rem;
+      z-index: 5;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 700px) {
+      .carousel { gap: 4px; }
+      .nav-btn { width: 38px; font-size: 1.1rem; }
+      .post { padding: 16px; }
+      main { padding: 16px 12px 50px; }
+      .linha-link { flex-direction: column; }
+      .linha-link input:first-child { flex: 1; }
+    }
+    /* ═══ TOAST (ranking) ═══════════════════════════════════ */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--accent);
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 400;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="assets/logo.png" alt="Logo" class="header-logo">
+    <span class="header-titulo">Chamados em Andamento</span>
+    <a class="btn btn-secondary" href="index.html">Aurora Desk</a>
+    <a class="btn btn-secondary" href="anotacoes.html">Anotações</a>
+    <a class="btn btn-secondary" href="ranking.html">Ranking</a>
+    <span class="spacer"></span>
+    <span class="sync-status syncing" id="sync-status" style="display:none;" title="Usuário / conexão">● usuário</span>
+    <button class="btn btn-secondary" id="btn-sair" style="display:none;" onclick="sair()">Sair</button>
+    <button class="btn btn-primary" onclick="abrirModal()">+ Novo Chamado</button>
+  </header>
+
+  <main>
+    <section>
+      <div class="secao-titulo">Em andamento / Validação cliente <span class="qtd" id="qtd-ativos">0</span></div>
+      <div class="vazio" id="vazio-ativos">
+        Nenhum chamado ativo no momento.
+        <div><button class="btn btn-primary" onclick="abrirModal()">+ Criar primeiro chamado</button></div>
+      </div>
+      <div class="carousel" id="carousel-ativos" style="display:none;">
+        <button class="nav-btn" id="prev-ativos" onclick="navAtivos(-1)">◀</button>
+        <div class="viewport">
+          <div class="track" id="track-ativos"></div>
+        </div>
+        <button class="nav-btn" id="next-ativos" onclick="navAtivos(1)">▶</button>
+      </div>
+      <div class="contador" id="contador-ativos" style="display:none;"></div>
+    </section>
+
+    <section id="secao-resolvidos" style="display:none;">
+      <div class="secao-titulo">Chamados resolvidos <span class="qtd" id="qtd-resolvidos">0</span></div>
+      <div class="carousel">
+        <button class="nav-btn" id="prev-resolvidos" onclick="navResolvidos(-1)">◀</button>
+        <div class="viewport">
+          <div class="track" id="track-resolvidos"></div>
+        </div>
+        <button class="nav-btn" id="next-resolvidos" onclick="navResolvidos(1)">▶</button>
+      </div>
+      <div class="contador" id="contador-resolvidos"></div>
+    </section>
+
+    <section id="secao-registro" style="display:none;">
+      <div class="secao-titulo">Registro de ligação <span class="qtd" id="qtd-registro">0</span></div>
+      <div class="carousel">
+        <button class="nav-btn" id="prev-registro" onclick="navRegistro(-1)">◀</button>
+        <div class="viewport">
+          <div class="track" id="track-registro"></div>
+        </div>
+        <button class="nav-btn" id="next-registro" onclick="navRegistro(1)">▶</button>
+      </div>
+      <div class="contador" id="contador-registro"></div>
+    </section>
+  </main>
+
+  <!-- Modal Novo/Editar Chamado -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2 id="modal-titulo">Novo Chamado</h2>
+      <div class="form-group" id="form-titulo">
+        <label>Título do chamado</label>
+        <input type="text" id="campo-titulo" placeholder="Ex: Impressora da bilheteria de Ponta Grossa">
+      </div>
+      <div class="form-group" id="form-status">
+        <label>Status</label>
+        <select id="campo-status" onchange="alternarFormLigacao()">
+          <option value="em_andamento">Em andamento</option>
+          <option value="validacao_cliente">Validação cliente</option>
+          <option value="concluido">Concluído</option>
+          <option value="registro_ligacao">Registro de ligação</option>
+        </select>
+      </div>
+      <div class="form-group" id="grupo-ligacao" style="display:none;">
+        <div class="bloco">
+          <label>Título do chamado (opcional)</label>
+          <input type="text" id="campo-titulo-lig" placeholder="Ex: Suporte - reset de senha">
+        </div>
+        <div class="bloco">
+          <label>Quem ligou / cidade</label>
+          <input type="text" id="campo-quem-cidade" placeholder="Ex: João da Silva - Ponta Grossa">
+        </div>
+        <div class="bloco">
+          <label>Data</label>
+          <input type="date" id="campo-data-lig">
+        </div>
+        <div class="bloco">
+          <label>Hora</label>
+          <input type="time" id="campo-hora-lig">
+        </div>
+        <div class="bloco">
+          <label>Resumo do atendimento</label>
+          <textarea id="campo-resumo-lig" placeholder="Descreva o atendimento..."></textarea>
+        </div>
+      </div>
+      <div class="form-group" id="form-descricao">
+        <label>Texto / descrição do chamado</label>
+        <textarea id="campo-descricao" placeholder="Descreva o chamado, o que já foi feito, o que falta..."></textarea>
+      </div>
+      <div class="form-group" id="form-links">
+        <label>Links úteis</label>
+        <div class="linhas-links" id="lista-links"></div>
+        <button class="btn-lite" type="button" onclick="adicionarLinhaLink()">+ Adicionar link</button>
+      </div>
+      <div class="form-group" id="form-queries">
+        <label>Queries SQL</label>
+        <div class="linhas-queries" id="lista-queries"></div>
+        <button class="btn-lite" type="button" onclick="adicionarLinhaQuery()">+ Adicionar SQL</button>
+      </div>
+      <div class="form-group" id="form-imagens">
+        <label id="label-imagens">Imagens</label>
+        <div class="image-upload-area" id="upload-area">
+          Arraste imagens aqui ou clique para selecionar
+          <input type="file" id="campo-imagens" accept="image/*" multiple>
+        </div>
+        <div class="image-preview-container" id="image-preview"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarChamado()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Registrar Ponto (ranking) -->
+  <div class="modal-overlay" id="modal-ponto">
+    <div class="modal" style="max-width: 460px;">
+      <h2>Registrar ponto no ranking</h2>
+      <div class="form-group">
+        <label>Chamado: <strong id="ponto-chamado-titulo">—</strong></label>
+      </div>
+      <div class="form-group">
+        <label>Link do chamado (obrigatório)</label>
+        <input type="text" id="ponto-link" placeholder="https://...">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModalPontoChamado()">Agora não</button>
+        <button class="btn btn-primary" onclick="registrarPontoChamado()">Registrar (+1 ponto)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <img id="lightbox-img" src="" alt="Imagem ampliada">
+    <div class="lightbox-hint" id="lightbox-hint">Role p/ zoom · arraste p/ mover · clique p/ alternar</div>
+    <div class="lightbox-controls">
+      <button id="btn-menos" title="Reduzir">−</button>
+      <button id="btn-mais" title="Ampliar">+</button>
+      <button id="btn-reset" title="Ajustar à tela">⟲</button>
+      <button id="btn-download" title="Baixar imagem">↧</button>
+    </div>
+  </div>
+
+  <script>
+    // ═══ FIREBASE ═════════════════════════════════════════
+    // Firebase (config/init), db, auth e helpers comuns vêm de app-comum.js
+
+    // ═══ ESTADO ═══════════════════════════════════════════
+    const LS_FALLBACK = 'aurora_desk_chamados_fallback';
+    const MAX_IMAGE_WIDTH = 1920;
+    const MAX_IMAGE_HEIGHT = 1080;
+
+    const STATUS_LABEL = {
+      em_andamento: 'Em andamento',
+      validacao_cliente: 'Validação cliente',
+      concluido: 'Concluído',
+      registro_ligacao: 'Registro de ligação'
+    };
+
+    let chamados = [];
+    let editandoId = null;
+    let imagensTemp = [];
+    let idxAtivos = 0;
+    let idxResolvidos = 0;
+    let idxRegistro = 0;
+    let unsubscribe = null;
+
+    // ═══ STATUS DE CONEXÃO ═══════════════════════════════
+    let syncEstado = 'syncing';
+    let usuarioNome = '';
+    function renderChip() {
+      const el = document.getElementById('sync-status');
+      el.className = 'sync-status ' + syncEstado;
+      el.textContent = '● ' + (usuarioNome || 'usuário');
+      el.title = 'Usuário: ' + (usuarioNome || '—') + ' — ' +
+        (syncEstado === 'online' ? 'Conectado' : syncEstado === 'syncing' ? 'Sincronizando' : 'Offline');
+    }
+    function setSyncStatus(status) {
+      syncEstado = status;
+      renderChip();
+    }
+
+    if (typeof db.enableNetwork === 'function') {
+      db.enableNetwork().then(() => setSyncStatus('online')).catch(() => setSyncStatus('offline'));
+    } else {
+      setSyncStatus('online');
+    }
+
+    // ═══ ESCUTA EM TEMPO REAL ═════════════════════════════
+    function escutarChamados() {
+      setSyncStatus('syncing');
+      unsubscribe = db.collection('chamados').where('ownerUid', '==', usuarioAtual.uid).onSnapshot(
+        snapshot => {
+          chamados = [];
+          snapshot.forEach(doc => chamados.push({ id: doc.id, ...doc.data() }));
+          renderizarTudo();
+          setSyncStatus('online');
+        },
+        error => {
+          console.error('Erro ao escutar chamados:', error);
+          setSyncStatus('offline');
+          const ls = localStorage.getItem(LS_FALLBACK);
+          if (ls) { try { chamados = JSON.parse(ls).filter(c => c && c.ownerUid === usuarioAtual.uid); renderizarTudo(); } catch (e) {} }
+        }
+      );
+    }
+
+    // ═══ PERSISTÊNCIA ═════════════════════════════════════
+    async function salvarChamadoFirestore(chamado) {
+      try {
+        await db.collection('chamados').doc(chamado.id).set(chamado);
+      } catch (e) {
+        console.error('Erro ao salvar chamado:', e);
+        alert('Erro ao salvar o chamado: ' + (e && e.message ? e.message : e) + '\nNada foi alterado.');
+        return false;
+      }
+      // Atualização otimista: garante render mesmo offline/sem onSnapshot
+      const idx = chamados.findIndex(c => c.id === chamado.id);
+      if (idx !== -1) chamados[idx] = chamado;
+      else chamados.push(chamado);
+      fallbackSalvar();
+      renderizarTudo();
+      return true;
+    }
+
+    async function excluirChamadoFirestore(id) {
+      try {
+        await db.collection('chamados').doc(id).delete();
+      } catch (e) {
+        console.error('Erro ao excluir chamado:', e);
+        alert('Erro ao excluir o chamado: ' + (e && e.message ? e.message : e) + '\nO chamado continua na lista.');
+        return false;
+      }
+      chamados = chamados.filter(c => c.id !== id);
+      fallbackSalvar();
+      renderizarTudo();
+      return true;
+    }
+
+    function fallbackSalvar() {
+      localStorage.setItem(LS_FALLBACK, JSON.stringify(chamados));
+    }
+
+    // ═══ UTILITÁRIOS ══════════════════════════════════════
+    // escapeHtml() (global) vem de app-comum.js
+    function gerarId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+    // Limite de imagens por doc (Firestore = 1MiB/doc; 900KB deixa folga pro texto)
+    const MAX_IMAGENS_DOC = 900 * 1024;
+    function tamanhoImagensBytes(imagens) {
+      return (imagens || []).reduce((total, src) => {
+        if (typeof src !== 'string') return total;
+        const virgula = src.indexOf(',');
+        const corpo = virgula >= 0 ? src.slice(virgula + 1) : src;
+        return total + Math.ceil(corpo.length * 0.75);
+      }, 0);
+    }
+    function formatarData(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    function normalizarUrl(url) {
+      url = url.trim();
+      if (!url) return '';
+      if (!/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) return 'https://' + url;
+      return url;
+    }
+    function formatarTexto(texto) {
+      if (!texto) return '';
+      const paragrafos = texto.split(/\n{2,}/);
+      return paragrafos.map(p => {
+        const comQuebras = escapeHtml(p).replace(/\n/g, '<br>');
+        return '<p>' + comQuebras + '</p>';
+      }).join('');
+    }
+
+    // ═══ FILTRAGEM / ORDENAÇÃO ═══════════════════════════
+    function chamadosAtivos() {
+      return chamados
+        .filter(c => c.status !== 'concluido' && c.status !== 'registro_ligacao')
+        .sort((a, b) => ((b.atualizadoEm || b.data || '') + '').localeCompare((a.atualizadoEm || a.data || '') + ''));
+    }
+    function chamadosResolvidos() {
+      return chamados
+        .filter(c => c.status === 'concluido')
+        .sort((a, b) => ((b.dataConclusao || b.data || '') + '').localeCompare((a.dataConclusao || a.data || '') + ''));
+    }
+    function chamadosRegistro() {
+      return chamados
+        .filter(c => c.status === 'registro_ligacao')
+        .sort((a, b) => ((b.atualizadoEm || b.data || '') + '').localeCompare((a.atualizadoEm || a.data || '') + ''));
+    }
+
+    // ═══ RENDERIZAÇÃO ═════════════════════════════════════
+    function renderizarTudo() {
+      const ativos = chamadosAtivos();
+      const resolvidos = chamadosResolvidos();
+      const registro = chamadosRegistro();
+
+      idxAtivos = Math.min(Math.max(idxAtivos, 0), Math.max(ativos.length - 1, 0));
+      idxResolvidos = Math.min(Math.max(idxResolvidos, 0), Math.max(resolvidos.length - 1, 0));
+      idxRegistro = Math.min(Math.max(idxRegistro, 0), Math.max(registro.length - 1, 0));
+
+      document.getElementById('qtd-ativos').textContent = ativos.length;
+      document.getElementById('qtd-resolvidos').textContent = resolvidos.length;
+      document.getElementById('qtd-registro').textContent = registro.length;
+
+      const carouselAtivos = document.getElementById('carousel-ativos');
+      const vazioAtivos = document.getElementById('vazio-ativos');
+
+      if (ativos.length === 0) {
+        carouselAtivos.style.display = 'none';
+        document.getElementById('contador-ativos').style.display = 'none';
+        vazioAtivos.classList.add('ativo');
+      } else {
+        carouselAtivos.style.display = 'flex';
+        document.getElementById('contador-ativos').style.display = 'block';
+        vazioAtivos.classList.remove('ativo');
+        construirTrack('track-ativos', ativos, idxAtivos);
+        document.getElementById('contador-ativos').textContent = (idxAtivos + 1) + ' / ' + ativos.length;
+      }
+
+      const secaoRes = document.getElementById('secao-resolvidos');
+      if (resolvidos.length === 0) {
+        secaoRes.style.display = 'none';
+      } else {
+        secaoRes.style.display = 'block';
+        construirTrack('track-resolvidos', resolvidos, idxResolvidos);
+        document.getElementById('contador-resolvidos').textContent = (idxResolvidos + 1) + ' / ' + resolvidos.length;
+      }
+
+      const secaoReg = document.getElementById('secao-registro');
+      if (registro.length === 0) {
+        secaoReg.style.display = 'none';
+      } else {
+        secaoReg.style.display = 'block';
+        construirTrack('track-registro', registro, idxRegistro);
+        document.getElementById('contador-registro').textContent = (idxRegistro + 1) + ' / ' + registro.length;
+      }
+    }
+
+    function construirTrack(trackId, lista, indice) {
+      const track = document.getElementById(trackId);
+      track.innerHTML = '';
+      lista.forEach(caso => track.appendChild(criarPost(caso)));
+      aplicarPosicao(track, indice);
+    }
+
+    function aplicarPosicao(track, indice) {
+      track.style.transform = 'translateX(-' + (indice * 100) + '%)';
+      ajustarAltura(track, indice);
+    }
+
+    // Ajusta a altura do track à altura natural do slide ativo, evitando a
+    // sobra de espaço causada pelo slide mais alto (align-items: stretch).
+    function ajustarAltura(track, indice) {
+      const alvo = track.children[indice];
+      const post = alvo && alvo.firstElementChild;
+      if (!post) { track.style.height = ''; return; }
+      const cs = getComputedStyle(alvo);
+      const altura = post.getBoundingClientRect().height +
+        parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      track.style.height = altura > 0 ? altura + 'px' : '';
+    }
+
+    function recalcularAlturas() {
+      ajustarAltura(document.getElementById('track-ativos'), idxAtivos);
+      ajustarAltura(document.getElementById('track-resolvidos'), idxResolvidos);
+      ajustarAltura(document.getElementById('track-registro'), idxRegistro);
+    }
+
+    window.addEventListener('resize', recalcularAlturas);
+
+    // Chamados são pessoais: cada usuário só vê os seus (ownerUid === uid).
+    function podeEditar(caso) {
+      if (!caso || !caso.ownerUid) return true;
+      return !!(usuarioAtual && caso.ownerUid === usuarioAtual.uid);
+    }
+
+    function criarPost(caso) {
+      const div = document.createElement('div');
+      div.className = 'slide';
+      const podeEd = podeEditar(caso);
+
+      const rotulo = STATUS_LABEL[caso.status] || 'Em andamento';
+      const dataTexto = formatarData(caso.status === 'concluido' ? (caso.dataConclusao || caso.data) : (caso.atualizadoEm || caso.data));
+
+      const linksHtml = (caso.links || []).filter(l => l && l.url).map(l =>
+        '<a class="link-item" href="' + escapeHtml(normalizarUrl(l.url)) + '" target="_blank" rel="noopener">' +
+        escapeHtml(l.rotulo || l.url) +
+        '</a>'
+      ).join('');
+
+      const queriesHtml = (caso.queries || []).filter(q => q && q.query).length > 0
+        ? '<div class="post-queries"><div class="post-queries-titulo">Queries SQL</div>' +
+          caso.queries.filter(q => q && q.query).map(q =>
+            '<div class="query-item">' +
+            '<div class="query-head">' +
+            (q.resumo ? '<span class="query-resumo">' + escapeHtml(q.resumo) + '</span>' : '') +
+            '<span class="query-head-spacer"></span>' +
+            '<button type="button" class="btn-copy-query">Copiar</button>' +
+            '</div>' +
+            '<pre class="query-code">' + escapeHtml(q.query) + '</pre>' +
+            '</div>'
+          ).join('') + '</div>'
+        : '';
+
+      const imgsHtml = (caso.imagens || []).length > 0
+        ? '<div class="post-imgs">' + caso.imagens.map(img =>
+            '<img src="' + img + '" alt="Imagem do chamado" loading="lazy">'
+          ).join('') + '</div>'
+        : '';
+
+      const corpo = document.createElement('div');
+      corpo.className = 'post';
+      if (caso.status === 'registro_ligacao') {
+        corpo.innerHTML = corpoLigacao(caso, imgsHtml, dataTexto);
+      } else {
+        corpo.innerHTML = `
+        <div class="post-topo">
+          <span class="badge badge-${caso.status || 'em_andamento'}">${escapeHtml(rotulo)}</span>
+          <span class="post-data">${dataTexto}</span>
+        </div>
+        <h2 class="post-titulo">${escapeHtml(caso.titulo || '')}</h2>
+        ${caso.descricao ? '<div class="post-texto">' + formatarTexto(caso.descricao) + '</div>' : ''}
+        ${linksHtml ? '<div class="post-links">' + linksHtml + '</div>' : ''}
+        ${queriesHtml}
+        ${imgsHtml}
+        <div class="status-bar">
+          <button type="button" class="sbtn ${caso.status === 'em_andamento' ? 'selecionado-em_andamento' : ''}" data-status="em_andamento" ${podeEd ? '' : 'disabled'}>Em andamento</button>
+          <button type="button" class="sbtn ${caso.status === 'validacao_cliente' ? 'selecionado-validacao_cliente' : ''}" data-status="validacao_cliente" ${podeEd ? '' : 'disabled'}>Validação cliente</button>
+          <button type="button" class="sbtn ${caso.status === 'concluido' ? 'selecionado-concluido' : ''}" data-status="concluido" ${podeEd ? '' : 'disabled'}>Concluído</button>
+        </div>
+        ${podeEd ? `<div class="post-acoes">
+          <button class="btn btn-secondary" data-acao="editar">Editar</button>
+          <button class="btn btn-secondary" data-acao="excluir">Excluir</button>
+        </div>` : ''}
+      `;
+      }
+
+      const id = caso.id;
+      corpo.querySelectorAll('.sbtn').forEach(btn => {
+        if (btn.disabled) return;
+        btn.addEventListener('click', () => definirStatus(id, btn.getAttribute('data-status')));
+      });
+      corpo.querySelectorAll('.post-imgs img').forEach(img => {
+        img.addEventListener('click', () => abrirLightbox(img.src));
+      });
+      const btnEditar = corpo.querySelector('[data-acao="editar"]');
+      const btnExcluir = corpo.querySelector('[data-acao="excluir"]');
+      if (btnEditar) btnEditar.addEventListener('click', () => abrirModal(id));
+      if (btnExcluir) btnExcluir.addEventListener('click', () => excluirChamado(id));
+
+      corpo.querySelectorAll('.query-item').forEach(item => {
+        const btn = item.querySelector('.btn-copy-query');
+        btn.addEventListener('click', () => copiarTexto(item.querySelector('.query-code').textContent, btn));
+      });
+
+      div.appendChild(corpo);
+      return div;
+    }
+
+    function corpoLigacao(caso, imgsHtml, dataTexto) {
+      const lig = caso.ligacao || {};
+      const infoData = [lig.data, lig.hora].filter(Boolean).join(' · ');
+      const titulo = (caso.titulo && caso.titulo.trim()) ? caso.titulo.trim() : (lig.quemCidade || '—');
+      const quemExtra = (caso.titulo && caso.titulo.trim() && lig.quemCidade)
+        ? '<div class="post-texto"><strong>Quem ligou / cidade:</strong> ' + escapeHtml(lig.quemCidade) + '</div>'
+        : '';
+      return `
+        <div class="post-topo">
+          <span class="badge badge-registro_ligacao">Registro de ligação</span>
+          <span class="post-data">${dataTexto}</span>
+        </div>
+        <h2 class="post-titulo">${escapeHtml(titulo)}</h2>
+        ${quemExtra}
+        ${infoData ? '<div class="post-texto"><strong>Data/Hora:</strong> ' + escapeHtml(infoData) + '</div>' : ''}
+        ${lig.resumo ? '<div class="post-texto"><strong>Resumo do atendimento:</strong></div><div class="post-texto">' + formatarTexto(lig.resumo) + '</div>' : ''}
+        ${imgsHtml}
+        ${podeEditar(caso) ? `<div class="post-acoes">
+          <button class="btn btn-secondary" data-acao="editar">Editar</button>
+          <button class="btn btn-secondary" data-acao="excluir">Excluir</button>
+        </div>` : ''}
+      `;
+    }
+
+    function definirStatus(id, status) {
+      const idx = chamados.findIndex(c => c.id === id);
+      if (idx === -1) return;
+      const caso = chamados[idx];
+      if (!podeEditar(caso)) { alert('Só quem criou este chamado pode alterar o status.'); return; }
+      const atualizado = { ...caso, status, atualizadoEm: new Date().toISOString() };
+      if (status === 'concluido' && !atualizado.dataConclusao) atualizado.dataConclusao = new Date().toISOString();
+      if (status !== 'concluido') atualizado.dataConclusao = null;
+      const eraConcluido = caso.status === 'concluido';
+      salvarChamadoFirestore(atualizado).then(ok => {
+        if (ok && status === 'concluido' && !eraConcluido) oferecerRegistrarPonto(atualizado);
+      });
+    }
+
+    // ═══ RANKING (ponto por chamado encerrado) ════════════
+    let pontoChamadoPendente = null;
+
+    function chaveDataLocal(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    async function oferecerRegistrarPonto(caso) {
+      if (!usuarioAtual || !caso) return;
+      // Já registrado para este chamado? (id determinístico uid_chamadoId)
+      try {
+        const snap = await db.collection('conclusoes').doc(usuarioAtual.uid + '_' + caso.id).get();
+        if (snap.exists) { showToast('Ponto já registrado para este chamado.'); return; }
+      } catch (e) { /* offline: segue e tenta gravar */ }
+      pontoChamadoPendente = caso;
+      document.getElementById('ponto-link').value = '';
+      document.getElementById('ponto-chamado-titulo').textContent = caso.titulo || '(sem título)';
+      document.getElementById('modal-ponto').classList.add('active');
+      setTimeout(() => document.getElementById('ponto-link').focus(), 50);
+    }
+
+    function fecharModalPontoChamado() {
+      pontoChamadoPendente = null;
+      document.getElementById('modal-ponto').classList.remove('active');
+    }
+
+    async function registrarPontoChamado() {
+      const caso = pontoChamadoPendente;
+      if (!caso || !usuarioAtual) { fecharModalPontoChamado(); return; }
+      const link = normalizarUrl(document.getElementById('ponto-link').value);
+      if (!link) { alert('Informe o link do chamado (obrigatório).'); return; }
+      const agora = new Date();
+      const doc = {
+        ownerUid: usuarioAtual.uid,
+        username: usuarioNome || (usuarioAtual.email ? usuarioAtual.email.split('@')[0] : 'usuário'),
+        link: link,
+        dia: chaveDataLocal(agora),
+        data: agora.toISOString(),
+        chamadoId: caso.id,
+        titulo: caso.titulo || ''
+      };
+      try {
+        await db.collection('conclusoes').doc(usuarioAtual.uid + '_' + caso.id).set(doc);
+      } catch (e) {
+        console.error('Erro ao registrar ponto:', e);
+        alert('Erro ao registrar o ponto: ' + (e && e.message ? e.message : e));
+        return;
+      }
+      fecharModalPontoChamado();
+      showToast('Ponto registrado! +1');
+    }
+
+    function showToast(msg) {
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.classList.add('show'), 10);
+      setTimeout(() => {
+        t.classList.remove('show');
+        setTimeout(() => t.remove(), 300);
+      }, 2000);
+    }
+
+    document.getElementById('modal-ponto').addEventListener('click', function (e) {
+      if (e.target === this) fecharModalPontoChamado();
+    });
+    document.getElementById('ponto-link').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') registrarPontoChamado();
+    });
+
+    // ═══ NAVEGAÇÃO DO CARROSSEL ═══════════════════════════
+    function navAtivos(delta) {
+      const ativos = chamadosAtivos();
+      if (ativos.length === 0) return;
+      idxAtivos = (idxAtivos + delta + ativos.length) % ativos.length;
+      construirTrack('track-ativos', ativos, idxAtivos);
+      document.getElementById('contador-ativos').textContent = (idxAtivos + 1) + ' / ' + ativos.length;
+    }
+
+    function navResolvidos(delta) {
+      const resolvidos = chamadosResolvidos();
+      if (resolvidos.length === 0) return;
+      idxResolvidos = (idxResolvidos + delta + resolvidos.length) % resolvidos.length;
+      construirTrack('track-resolvidos', resolvidos, idxResolvidos);
+      document.getElementById('contador-resolvidos').textContent = (idxResolvidos + 1) + ' / ' + resolvidos.length;
+    }
+
+    function navRegistro(delta) {
+      const registro = chamadosRegistro();
+      if (registro.length === 0) return;
+      idxRegistro = (idxRegistro + delta + registro.length) % registro.length;
+      construirTrack('track-registro', registro, idxRegistro);
+      document.getElementById('contador-registro').textContent = (idxRegistro + 1) + ' / ' + registro.length;
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (document.getElementById('modal').classList.contains('active')) return;
+      if (document.getElementById('modal-ponto').classList.contains('active')) return;
+      if (e.key === 'ArrowLeft') navAtivos(-1);
+      else if (e.key === 'ArrowRight') navAtivos(1);
+      else if (e.key === 'Escape') { fecharModal(); fecharLightbox(); fecharModalPontoChamado(); }
+    });
+
+    // ═══ CRUD ═════════════════════════════════════════════
+    function abrirModal(id) {
+      editandoId = id || null;
+      imagensTemp = [];
+
+      if (id) {
+        const caso = chamados.find(c => c.id === id);
+        if (!caso) return;
+        if (!podeEditar(caso)) { alert('Só quem criou este chamado pode editá-lo.'); editandoId = null; return; }
+      }
+
+      document.getElementById('lista-links').innerHTML = '';
+      document.getElementById('lista-queries').innerHTML = '';
+
+      if (id) {
+        const caso = chamados.find(c => c.id === id);
+        document.getElementById('modal-titulo').textContent = 'Editar Chamado';
+        document.getElementById('campo-titulo').value = caso.titulo || '';
+        document.getElementById('campo-status').value = caso.status || 'em_andamento';
+        document.getElementById('campo-descricao').value = caso.descricao || '';
+        imagensTemp = caso.imagens ? [...caso.imagens] : [];
+        (caso.links || []).forEach(l => adicionarLinhaLink(l.rotulo || '', l.url || ''));
+        (caso.queries || []).forEach(q => adicionarLinhaQuery(q.resumo || '', q.query || ''));
+        const lig = caso.ligacao || {};
+        document.getElementById('campo-titulo-lig').value = caso.titulo || '';
+        document.getElementById('campo-quem-cidade').value = lig.quemCidade || '';
+        document.getElementById('campo-data-lig').value = lig.data || '';
+        document.getElementById('campo-hora-lig').value = lig.hora || '';
+        document.getElementById('campo-resumo-lig').value = lig.resumo || '';
+      } else {
+        document.getElementById('modal-titulo').textContent = 'Novo Chamado';
+        document.getElementById('campo-titulo').value = '';
+        document.getElementById('campo-status').value = 'em_andamento';
+        document.getElementById('campo-descricao').value = '';
+        document.getElementById('campo-titulo-lig').value = '';
+        document.getElementById('campo-quem-cidade').value = '';
+        document.getElementById('campo-data-lig').value = '';
+        document.getElementById('campo-hora-lig').value = '';
+        document.getElementById('campo-resumo-lig').value = '';
+      }
+
+      renderizarPreviewImagens();
+      document.getElementById('modal').classList.add('active');
+      alternarFormLigacao();
+      const focoEm = document.getElementById('campo-status').value === 'registro_ligacao' ? 'campo-quem-cidade' : 'campo-titulo';
+      document.getElementById(focoEm).focus();
+    }
+
+    function fecharModal() {
+      document.getElementById('modal').classList.remove('active');
+      editandoId = null;
+      imagensTemp = [];
+    }
+
+    function alternarFormLigacao() {
+      const ehLig = document.getElementById('campo-status').value === 'registro_ligacao';
+      document.getElementById('form-titulo').style.display = ehLig ? 'none' : '';
+      document.getElementById('form-descricao').style.display = ehLig ? 'none' : '';
+      document.getElementById('form-links').style.display = ehLig ? 'none' : '';
+      document.getElementById('form-queries').style.display = ehLig ? 'none' : '';
+      document.getElementById('grupo-ligacao').style.display = ehLig ? '' : 'none';
+      document.getElementById('label-imagens').textContent = ehLig ? 'Imagem (opcional)' : 'Imagens';
+      document.getElementById('modal-titulo').textContent = ehLig
+        ? (editandoId ? 'Editar Registro de Ligação' : 'Novo Registro de Ligação')
+        : (editandoId ? 'Editar Chamado' : 'Novo Chamado');
+    }
+
+    function adicionarLinhaLink(rotulo, url) {
+      const container = document.getElementById('lista-links');
+      const linha = document.createElement('div');
+      linha.className = 'linha-link';
+      linha.innerHTML = `
+        <input type="text" class="campo-link-rotulo" placeholder="Rótulo" value="${escapeHtml(rotulo || '')}">
+        <input type="text" class="campo-link-url" placeholder="https://..." value="${escapeHtml(url || '')}">
+        <button type="button" onclick="this.parentElement.remove()">Remover</button>
+      `;
+      container.appendChild(linha);
+    }
+
+    function adicionarLinhaQuery(resumo, query) {
+      const container = document.getElementById('lista-queries');
+      const linha = document.createElement('div');
+      linha.className = 'linha-query';
+      linha.innerHTML = `
+        <div class="linha-query-topo">
+          <input type="text" class="campo-query-resumo" placeholder="Resumo breve do que a query busca" value="${escapeHtml(resumo || '')}">
+          <button type="button" class="btn-remove-query" onclick="this.parentElement.parentElement.remove()">Remover</button>
+        </div>
+        <textarea class="campo-query-sql" placeholder="SELECT * FROM tabela WHERE ..."></textarea>
+      `;
+      if (query) linha.querySelector('.campo-query-sql').value = query;
+      container.appendChild(linha);
+    }
+
+    function copiarTexto(texto, botao) {
+      const restaurar = () => {
+        const original = botao.getAttribute('data-rotulo') || 'Copiar';
+        botao.textContent = original;
+      };
+      const sucesso = () => {
+        botao.setAttribute('data-rotulo', 'Copiar');
+        botao.textContent = 'Copiado!';
+        setTimeout(restaurar, 1300);
+      };
+      const fallback = () => {
+        const ta = document.createElement('textarea');
+        ta.value = texto;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          if (document.execCommand('copy')) sucesso();
+          else restaurar();
+        } catch (e) {
+          restaurar();
+        }
+        document.body.removeChild(ta);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(texto).then(sucesso).catch(fallback);
+      } else {
+        fallback();
+      }
+    }
+
+    function salvarChamado() {
+      const titulo = document.getElementById('campo-titulo').value.trim();
+      const status = document.getElementById('campo-status').value;
+      const descricao = document.getElementById('campo-descricao').value.trim();
+
+      const links = [...document.querySelectorAll('#lista-links .linha-link')].map(linha => {
+        const rotulo = linha.querySelector('.campo-link-rotulo').value.trim();
+        const url = linha.querySelector('.campo-link-url').value.trim();
+        if (!url) return null;
+        return { rotulo: rotulo || url, url };
+      }).filter(Boolean);
+
+      const queries = [...document.querySelectorAll('#lista-queries .linha-query')].map(linha => {
+        const resumo = linha.querySelector('.campo-query-resumo').value.trim();
+        const query = linha.querySelector('.campo-query-sql').value.trim();
+        if (!query) return null;
+        return { resumo, query };
+      }).filter(Boolean);
+
+      let chamado;
+      const agora = new Date().toISOString();
+      if (status === 'registro_ligacao') {
+        const quemCidade = document.getElementById('campo-quem-cidade').value.trim();
+        if (!quemCidade) { alert('Informe quem ligou / cidade.'); return; }
+        const tituloLig = document.getElementById('campo-titulo-lig').value.trim();
+        const ligacao = {
+          quemCidade,
+          data: document.getElementById('campo-data-lig').value,
+          hora: document.getElementById('campo-hora-lig').value,
+          resumo: document.getElementById('campo-resumo-lig').value.trim()
+        };
+        const base = editandoId ? chamados.find(c => c.id === editandoId) : null;
+        chamado = {
+          id: editandoId || gerarId(),
+          titulo: tituloLig,
+          status: 'registro_ligacao',
+          ligacao,
+          imagens: [...imagensTemp],
+          data: (base && base.data) || agora,
+          atualizadoEm: agora,
+          dataConclusao: null
+        };
+      } else if (editandoId) {
+        if (!titulo) { alert('Informe o título do chamado.'); return; }
+        const idx = chamados.findIndex(c => c.id === editandoId);
+        if (idx === -1) return;
+        chamado = { ...chamados[idx], titulo, status, descricao, links, queries, imagens: [...imagensTemp], atualizadoEm: agora };
+        if (status === 'concluido' && !chamado.dataConclusao) chamado.dataConclusao = agora;
+        if (status !== 'concluido') chamado.dataConclusao = null;
+      } else {
+        if (!titulo) { alert('Informe o título do chamado.'); return; }
+        chamado = {
+          id: gerarId(), titulo, status, descricao, links, queries, imagens: [...imagensTemp],
+          data: agora, atualizadoEm: agora,
+          dataConclusao: status === 'concluido' ? agora : null
+        };
+      }
+
+      if (usuarioAtual && !chamado.ownerUid) chamado.ownerUid = usuarioAtual.uid;
+
+      const bytesImagens = tamanhoImagensBytes(chamado.imagens);
+      if (bytesImagens > MAX_IMAGENS_DOC) {
+        alert(
+          `As imagens deste chamado somam ${Math.ceil(bytesImagens / 1024)} KB e o limite por registro é 900 KB.\n` +
+          'Remova algumas imagens para conseguir salvar.'
+        );
+        return;
+      }
+
+      const statusAnterior = editandoId ? (chamados.find(c => c.id === editandoId) || {}).status : null;
+      salvarChamadoFirestore(chamado).then(ok => {
+        if (!ok) return;
+        fecharModal();
+        if (chamado.status === 'concluido' && statusAnterior !== 'concluido') oferecerRegistrarPonto(chamado);
+      });
+    }
+
+    async function excluirChamado(id) {
+      const caso = chamados.find(c => c.id === id);
+      if (!podeEditar(caso)) { alert('Só quem criou este chamado pode excluí-lo.'); return; }
+      if (!confirm('Excluir este chamado?')) return;
+      await excluirChamadoFirestore(id);
+    }
+
+    // ═══ IMAGENS ═══════════════════════════════════════════
+    function configurarUpload() {
+      const input = document.getElementById('campo-imagens');
+      const area = document.getElementById('upload-area');
+      input.addEventListener('change', (e) => { processarArquivos(e.target.files); input.value = ''; });
+      area.addEventListener('dragover', (e) => { e.preventDefault(); area.style.borderColor = 'var(--accent)'; });
+      area.addEventListener('dragleave', () => { area.style.borderColor = ''; });
+      area.addEventListener('drop', (e) => { e.preventDefault(); area.style.borderColor = ''; processarArquivos(e.dataTransfer.files); });
+    }
+
+    function processarArquivos(files) {
+      [...files].forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        if (file.size > 2 * 1024 * 1024) { alert('Imagem "' + file.name + '" é muito grande (máx. 2MB).'); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          redimensionarImagem(e.target.result, (resized) => { imagensTemp.push(resized); renderizarPreviewImagens(); });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function redimensionarImagem(dataUrl, callback) {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > MAX_IMAGE_WIDTH) { h = (h * MAX_IMAGE_WIDTH) / w; w = MAX_IMAGE_WIDTH; }
+        if (h > MAX_IMAGE_HEIGHT) { w = (w * MAX_IMAGE_HEIGHT) / h; h = MAX_IMAGE_HEIGHT; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const webp = canvas.toDataURL('image/webp', 0.8);
+        if (webp.length > 50) {
+          callback(webp);
+        } else {
+          callback(canvas.toDataURL('image/jpeg', 0.92));
+        }
+      };
+      img.src = dataUrl;
+    }
+
+    function renderizarPreviewImagens() {
+      const container = document.getElementById('image-preview');
+      container.innerHTML = '';
+      imagensTemp.forEach((img, i) => {
+        const item = document.createElement('div');
+        item.className = 'image-preview-item';
+        item.innerHTML = '<img src="' + img + '" alt="Preview" loading="lazy"><button onclick="removerImagemTemp(' + i + ')">✕</button>';
+        container.appendChild(item);
+      });
+    }
+
+    function removerImagemTemp(index) { imagensTemp.splice(index, 1); renderizarPreviewImagens(); }
+
+    // ═══ LIGHTBOX ══════════════════════════════════════════
+    let lbEscala = 1, lbTx = 0, lbTy = 0;
+    let lbArrastando = false, lbMoveu = false, lbInicio = null, lbPanInicio = null;
+
+    function lbAplicar() {
+      const img = document.getElementById('lightbox-img');
+      img.style.transform = 'translate(' + lbTx + 'px, ' + lbTy + 'px) scale(' + lbEscala + ')';
+      document.getElementById('btn-menos').disabled = lbEscala <= 1;
+      document.getElementById('btn-mais').disabled = lbEscala >= 8;
+    }
+
+    function abrirLightbox(src) {
+      lbEscala = 1; lbTx = 0; lbTy = 0;
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox').classList.add('active');
+      lbAplicar();
+    }
+
+    function fecharLightbox() {
+      document.getElementById('lightbox').classList.remove('active');
+      lbEscala = 1; lbTx = 0; lbTy = 0;
+    }
+
+    function lbZoomPasso(delta) {
+      lbEscala = Math.min(8, Math.max(1, Math.round((lbEscala + delta) * 100) / 100));
+      lbAplicar();
+    }
+
+    function lbBaixar() {
+      const img = document.getElementById('lightbox-img');
+      const link = document.createElement('a');
+      link.href = img.src;
+      link.download = img.src.indexOf('image/webp') > -1 ? 'imagem.webp' : 'imagem.jpg';
+      link.click();
+    }
+
+    function initLightbox() {
+      const lb = document.getElementById('lightbox');
+      const img = document.getElementById('lightbox-img');
+
+      img.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        lbZoomPasso(e.deltaY < 0 ? 0.5 : -0.5);
+      }, { passive: false });
+
+      img.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        lbArrastando = true; lbMoveu = false;
+        lbInicio = { x: e.clientX, y: e.clientY };
+        lbPanInicio = { tx: lbTx, ty: lbTy };
+        img.style.cursor = 'grabbing';
+      });
+      lb.addEventListener('mousemove', (e) => {
+        if (!lbArrastando) return;
+        const dx = e.clientX - lbInicio.x, dy = e.clientY - lbInicio.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) lbMoveu = true;
+        if (lbEscala > 1) {
+          lbTx = lbPanInicio.tx + dx;
+          lbTy = lbPanInicio.ty + dy;
+          lbAplicar();
+        }
+      });
+      lb.addEventListener('mouseup', () => {
+        if (lbArrastando) {
+          if (!lbMoveu) {
+            if (lbEscala > 1) { lbEscala = 1; lbTx = 0; lbTy = 0; }
+            else { lbEscala = 2.5; }
+            lbAplicar();
+          }
+          img.style.cursor = '';
+          lbArrastando = false;
+        }
+      });
+
+      document.getElementById('btn-menos').addEventListener('click', (e) => { e.stopPropagation(); lbZoomPasso(-0.5); });
+      document.getElementById('btn-mais').addEventListener('click', (e) => { e.stopPropagation(); lbZoomPasso(0.5); });
+      document.getElementById('btn-reset').addEventListener('click', (e) => { e.stopPropagation(); lbEscala = 1; lbTx = 0; lbTy = 0; lbAplicar(); });
+      document.getElementById('btn-download').addEventListener('click', (e) => { e.stopPropagation(); lbBaixar(); });
+
+      lb.addEventListener('click', (e) => { if (e.target === lb) fecharLightbox(); });
+    }
+
+    // ═══ GATE DE ACESSO (Firebase Auth) ═══════════════════
+    // usuarioAtual (global) é definido em app-comum.js
+
+    async function preencherUsuarioHeader(user) {
+      let nome = user.email ? user.email.split('@')[0] : 'usuário';
+      try {
+        const snap = await db.collection('usuarios').doc(user.uid).get();
+        if (snap.exists && snap.data().nome) nome = snap.data().nome;
+      } catch (e) { console.warn('Perfil não lido:', e); }
+      usuarioNome = nome;
+      renderChip();
+      document.getElementById('sync-status').style.display = '';
+      document.getElementById('btn-sair').style.display = '';
+    }
+
+    // sair() (global) vem de app-comum.js
+
+    iniciarGate('chamados', user => {
+      preencherUsuarioHeader(user);
+      initLightbox();
+      configurarUpload();
+      escutarChamados();
+    });
+  </script>
+</body>
+</html>

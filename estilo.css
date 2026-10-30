@@ -1,0 +1,40 @@
+/* estilo.css — tokens (design) e reset compartilhados das páginas Aurora Desk.
+   Não depende do mock: contém apenas o que é idêntico/seguro entre as páginas. Os componentes
+   (.btn, header, .sync-status, .modal, etc.) divergiram por página e por isso
+   permanecem inline em cada HTML. */
+
+:root {
+  --bg: #1a1a2e;
+  --bg-card: #16213e;
+  --bg-input: #0f3460;
+  --text: #e0e0e0;
+  --text-muted: #a0a0b0;
+  --accent: #e94560;
+  --border: #2a2a4a;
+  --tag-urgente: #e94560;
+  --tag-frequente: #f5a623;
+  --tag-resolvido: #27ae60;
+  --tag-pendente: #3498db;
+  --ok: #27ae60;
+  --pend: #3498db;
+  --val: #f5a623;
+  --reg: #9b59b6;
+  --radius: 8px;
+  --header-h: 60px;
+  --panel-w-collapsed: 50px;
+  --panel-w-expanded: 300px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* Logo — o PNG oficial é escuro sobre fundo branco. Em vez de recortar o
+   fundo, ele é exibido como um selo claro arredondado, que combina com o
+   tema escuro. Vale para o header das telas e para o cartão de login. */
+img.header-logo,
+header img.logo,
+.login-card img.logo {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 3px;
+  box-sizing: content-box;
+}

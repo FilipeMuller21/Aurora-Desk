@@ -1,0 +1,2472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aurora Desk — Central de Chamados</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="mock-data.js"></script>
+  <script src="mock-firebase.js"></script>
+  <script src="app-comum.js"></script>
+  <style>
+    /* Tokens (:root) e reset agora vêm de estilo.css */
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ═══ HEADER ═══════════════════════════════════════════ */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: var(--header-h);
+    }
+
+    .header-logo {
+      height: 38px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .header-titulo {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .sync-status {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .sync-status.online { background: rgba(39,174,96,0.2); color: var(--tag-resolvido); }
+    .sync-status.offline { background: rgba(233,69,96,0.2); color: var(--tag-urgente); }
+    .sync-status.syncing { background: rgba(52,152,219,0.2); color: var(--tag-pendente); }
+
+    #busca {
+      flex: 1;
+      min-width: 180px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #busca:focus { border-color: var(--accent); }
+
+    .btn {
+      padding: 7px 14px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+
+    #result-count { font-size: 0.8rem; color: var(--text-muted); }
+
+    /* ═══ LAYOUT PRINCIPAL ═════════════════════════════════ */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ═══ PAINEL DE LINKS ══════════════════════════════════ */
+    .links-panel {
+      width: var(--panel-w-collapsed);
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0;
+      gap: 4px;
+      transition: width 0.25s ease;
+      overflow: hidden;
+      flex-shrink: 0;
+      height: calc(100vh - var(--header-h));
+      position: sticky;
+      top: var(--header-h);
+      z-index: 50;
+    }
+
+    .links-panel.expanded {
+      width: var(--panel-w-expanded);
+      align-items: stretch;
+      padding: 0;
+    }
+
+    .panel-toggle {
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .panel-toggle:hover { background: var(--accent); }
+
+    .links-panel.expanded .panel-toggle {
+      width: calc(100% - 16px);
+      margin: 8px;
+      justify-content: flex-start;
+      padding-left: 10px;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .panel-categories {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      width: 100%;
+    }
+
+    .panel-cat-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: transparent;
+      border: 2px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.2s;
+    }
+    .panel-cat-btn:hover { background: var(--bg-input); color: var(--text); }
+    .panel-cat-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.1); }
+
+    .links-panel.expanded .panel-cat-btn {
+      width: calc(100% - 16px);
+      margin: 0 8px;
+      border-radius: 6px;
+      justify-content: flex-start;
+      padding-left: 12px;
+      gap: 10px;
+      font-size: 0.9rem;
+      height: 36px;
+    }
+
+    .panel-cat-btn .cat-label { display: none; font-size: 0.85rem; white-space: nowrap; }
+    .links-panel.expanded .panel-cat-btn .cat-label { display: inline; }
+
+    .panel-cat-btn .cat-count { display: none; }
+    .links-panel.expanded .panel-cat-btn .cat-count {
+      display: inline;
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      background: var(--bg-input);
+      padding: 1px 7px;
+      border-radius: 10px;
+    }
+
+    .panel-add-cat {
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      margin-top: auto;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .panel-add-cat:hover { border-color: var(--accent); color: var(--accent); }
+
+    .links-panel.expanded .panel-add-cat {
+      width: calc(100% - 16px);
+      margin: 0 8px 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      gap: 6px;
+      height: 32px;
+    }
+
+    .panel-add-cat .add-label { display: none; }
+    .links-panel.expanded .panel-add-cat .add-label { display: inline; }
+
+    .panel-content {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      overflow: hidden;
+      width: 100%;
+    }
+    .links-panel.expanded .panel-content { display: flex; }
+
+    .panel-search { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .panel-search input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .panel-search input:focus { border-color: var(--accent); }
+
+    .panel-filter { padding: 4px 10px; }
+    .panel-filter select {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 0.8rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .panel-filter select:focus { border-color: var(--accent); }
+
+    .panel-links-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .panel-link-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .panel-link-item:hover { background: var(--bg-input); }
+
+    .panel-link-item .link-name {
+      flex: 1;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .panel-link-item .link-actions { display: none; gap: 2px; }
+    .panel-link-item:hover .link-actions { display: flex; }
+
+    .panel-link-item .link-actions button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-size: 0.75rem;
+    }
+    .panel-link-item .link-actions button:hover { color: var(--text); }
+    .panel-link-item .link-actions button.excluir-link:hover { color: var(--tag-urgente); }
+
+    .panel-link-item.contato-item {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      padding: 10px;
+    }
+
+    .contato-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .contato-nome { font-size: 0.85rem; font-weight: 600; }
+    .contato-empresa { font-size: 0.72rem; color: var(--text-muted); }
+
+    .contato-telefone { margin: 0; }
+
+    .panel-link-item.contato-item .link-actions {
+      display: none;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+    .panel-link-item.contato-item:hover .link-actions { display: flex; }
+    .panel-link-item.contato-item { position: relative; }
+
+    .panel-link-item .link-url-preview {
+      display: none;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
+    }
+    .panel-links-list:hover .panel-link-item .link-url-preview { display: block; }
+
+    .panel-cat-header {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      padding: 8px 10px 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .panel-empty-msg {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      padding: 20px 10px;
+    }
+
+    .panel-add-link-btn {
+      margin: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .panel-add-link-btn:hover { opacity: 0.85; }
+
+    /* ═══ CONTEÚDO PRINCIPAL ═══════════════════════════════ */
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      overflow-y: auto;
+      height: calc(100vh - var(--header-h));
+    }
+
+    .main-content main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* ═══ CHAMADOS ═════════════════════════════════════════ */
+    details {
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    summary {
+      background: var(--bg-card);
+      padding: 12px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      transition: background 0.2s;
+    }
+    summary:hover { background: #1b2a4a; }
+
+    summary .count {
+      background: var(--bg-input);
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .cards-grid {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.2s;
+    }
+    .card:hover { border-color: var(--accent); }
+    .card.hidden { display: none; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .card-header h3 { font-size: 0.95rem; flex: 1; }
+
+    .card-actions { display: flex; gap: 4px; }
+    .card-actions button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .card-actions button:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .card-actions button.excluir:hover { color: var(--tag-urgente); }
+
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tag-urgente { background: var(--tag-urgente); color: #fff; }
+    .tag-frequente { background: var(--tag-frequente); color: #1a1a2e; }
+    .tag-resolvido { background: var(--tag-resolvido); color: #fff; }
+    .tag-pendente { background: var(--tag-pendente); color: #fff; }
+
+    .descricao { font-size: 0.85rem; color: var(--text-muted); }
+    .passos { padding-left: 20px; font-size: 0.85rem; }
+    .passos li { margin-bottom: 3px; }
+
+    .comando-block {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .comando-block code {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: #7ee787;
+      overflow-x: auto;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .btn-copiar {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      white-space: nowrap;
+      transition: color 0.2s;
+    }
+    .btn-copiar:hover { color: var(--text); }
+
+    .query-blocks { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+    .query-item { border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); overflow: hidden; }
+    .query-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 12px; border-bottom: 1px solid var(--border); box-sizing: border-box; }
+    .query-head-spacer { flex: 1; }
+    .query-resumo { font-size: 0.82rem; color: var(--text); word-break: break-word; }
+    .btn-copy-query {
+      flex: 0 0 auto; background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--text-muted); border-radius: 6px; cursor: pointer;
+      font-size: 0.75rem; padding: 3px 10px; white-space: nowrap;
+    }
+    .btn-copy-query:hover { color: var(--text); border-color: var(--accent); }
+    .query-code {
+      margin: 0; padding: 10px 12px; overflow-x: auto;
+      font-family: Consolas, 'Courier New', monospace; font-size: 0.8rem;
+      color: #7ee787; background: var(--bg-input); line-height: 1.5;
+      white-space: pre-wrap; word-break: break-word;
+    }
+
+    .linhas-queries { display: flex; flex-direction: column; gap: 10px; }
+    .linha-query {
+      display: flex; flex-direction: column; gap: 6px;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; background: var(--bg-card);
+    }
+    .linha-query-topo { display: flex; gap: 8px; align-items: center; }
+    .linha-query-topo input { flex: 1; }
+    .linha-query textarea { min-height: 64px; font-family: Consolas, 'Courier New', monospace; font-size: 0.82rem; resize: vertical; }
+    .linha-query .btn-remove-query {
+      background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--accent); border-radius: 6px; cursor: pointer;
+      padding: 4px 10px; font-size: 0.8rem; white-space: nowrap;
+    }
+    .btn-add-query {
+      margin-top: 8px; background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--text-muted); border-radius: 6px; cursor: pointer;
+      padding: 5px 12px; font-size: 0.8rem;
+    }
+    .btn-add-query:hover { color: var(--text); border-color: var(--accent); }
+
+    .card-images { display: flex; gap: 10px; flex-wrap: wrap; }
+    .card-images img {
+      width: 210px;
+      height: 140px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: transform 0.2s;
+      object-fit: contain;
+      background: #06060a;
+    }
+    .card-images img:hover { transform: scale(1.03); }
+
+    .card-date { font-size: 0.7rem; color: var(--text-muted); text-align: right; }
+
+    .storage-warning {
+      background: rgba(245,166,35,0.15);
+      border: 1px solid var(--tag-frequente);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      color: var(--tag-frequente);
+      display: none;
+      margin-bottom: 14px;
+    }
+    .storage-warning.visible { display: block; }
+
+    /* ═══ MODAIS ═══════════════════════════════════════════ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+      overflow-y: auto;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal h2 { font-size: 1.15rem; }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus { border-color: var(--accent); }
+
+    .form-group textarea { resize: vertical; min-height: 70px; }
+
+    .checkbox-group { display: flex; gap: 12px; flex-wrap: wrap; }
+    .checkbox-group label { display: flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 400; }
+
+    .image-upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 6px;
+      padding: 18px;
+      text-align: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    .image-upload-area:hover { border-color: var(--accent); background: rgba(233,69,96,0.05); }
+    .image-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+    .image-preview-container { display: flex; gap: 8px; flex-wrap: wrap; }
+    .image-preview-item { position: relative; }
+    .image-preview-item img { max-width: 100px; max-height: 75px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; }
+    .image-preview-item button {
+      position: absolute; top: -6px; right: -6px;
+      background: var(--tag-urgente); color: #fff; border: none;
+      border-radius: 50%; width: 18px; height: 18px;
+      cursor: pointer; font-size: 0.65rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 300;
+      justify-content: center; align-items: center;
+      cursor: pointer;
+      overflow: hidden;
+      touch-action: none;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      object-fit: contain;
+      transform-origin: 50% 50%;
+      user-select: none;
+      -webkit-user-select: none;
+      will-change: transform;
+      transition: none;
+    }
+    .lightbox-controls {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      background: rgba(10,10,14,0.8);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      z-index: 5;
+    }
+    .lightbox-controls button {
+      background: #23232c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-size: 1.05rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox-controls button:hover { background: var(--accent); }
+    .lightbox-controls button:disabled { opacity: 0.35; cursor: default; }
+    .lightbox-controls button:disabled:hover { background: #23232c; }
+    .lightbox-hint {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.55);
+      font-size: 0.72rem;
+      z-index: 5;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .link-icon { font-size: 0.85rem; flex-shrink: 0; }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--accent);
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 400;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Modal de Link */
+    .link-type-toggle {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .link-type-toggle button {
+      flex: 1; padding: 8px; border: none;
+      background: var(--bg-input); color: var(--text-muted);
+      cursor: pointer; font-size: 0.82rem; transition: all 0.2s;
+    }
+    .link-type-toggle button.active { background: var(--accent); color: #fff; }
+
+    .ecommerce-fields { display: none; }
+    .ecommerce-fields.visible { display: flex; flex-direction: column; gap: 6px; }
+
+    .url-preview {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: #7ee787;
+      word-break: break-all;
+      min-height: 34px;
+    }
+
+    /* ═══ MOBILE ═══════════════════════════════════════════ */
+    .mobile-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 40;
+    }
+    .mobile-overlay.active { display: block; }
+
+    @media (max-width: 700px) {
+      header { height: auto; padding: 10px 14px; }
+      .header-logo { height: 30px; }
+      #busca { min-width: 0; width: 100%; }
+
+      .links-panel {
+        position: fixed;
+        left: 0; top: 0;
+        height: 100vh;
+        z-index: 60;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+      }
+      .links-panel.mobile-open { transform: translateX(0); }
+      .links-panel.expanded { width: var(--panel-w-expanded); }
+
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="assets/logo.png" alt="Logo" class="header-logo">
+    <span class="header-titulo">Aurora Desk</span>
+    <input type="text" id="busca" placeholder="Buscar por problema, solução, comando...">
+    <button class="btn btn-primary" onclick="abrirModal()">+ Novo Caso</button>
+    <a class="btn btn-secondary" href="anotacoes.html" style="text-decoration:none; display:inline-block;">Anotações</a>
+    <a class="btn btn-secondary" href="chamados.html" style="text-decoration:none; display:inline-block;">Chamados Ativos</a>
+    <a class="btn btn-secondary" href="ranking.html" style="text-decoration:none; display:inline-block;">Ranking</a>
+    <button class="btn btn-secondary" onclick="exportarDados()" title="Baixar backup de todas as coleções (casos, links, chamados, anotações, senhas)">Exportar</button>
+    <label class="btn btn-secondary" title="Importar backup .json" style="cursor:pointer; margin:0;">
+      Importar
+      <input type="file" id="import-file" accept=".json,application/json" style="display:none;" onchange="importarDados(event)">
+    </label>
+    <span class="sync-status syncing" id="sync-status" style="display:none;" title="Usuário / conexão">● usuário</span>
+    <button class="btn btn-secondary" id="btn-sair" style="display:none;" onclick="sair()">Sair</button>
+    <span id="result-count"></span>
+  </header>
+
+  <div class="app-body">
+    <aside class="links-panel" id="links-panel">
+      <button class="panel-toggle" onclick="togglePanel()" title="Menu de Links">≡</button>
+      <div class="panel-categories" id="panel-categories"></div>
+      <button class="panel-add-cat" onclick="abrirModalCategoria()" title="Nova categoria">
+        <span>+</span>
+        <span class="add-label">Nova categoria</span>
+      </button>
+      <div class="panel-content" id="panel-content">
+        <div class="panel-search">
+          <input type="text" id="busca-links" placeholder="Buscar link..." oninput="buscarLinks()">
+        </div>
+        <div class="panel-filter" id="filtro-localidade-wrap" style="display:none;">
+          <select id="filtro-localidade" onchange="buscarLinks()">
+            <option value="">Todas as localidades</option>
+          </select>
+        </div>
+        <div class="panel-links-list" id="panel-links-list"></div>
+        <button class="panel-add-link-btn" id="panel-add-btn" onclick="abrirModalAdicionar()">+ Novo Link</button>
+      </div>
+    </aside>
+    <div class="mobile-overlay" id="mobile-overlay" onclick="fecharPanelMobile()"></div>
+
+    <div class="main-content">
+      <main>
+        <details open data-category="hardware">
+          <summary>Hardware <span class="count">0</span></summary>
+          <div class="cards-grid"></div>
+        </details>
+        <details open data-category="software">
+          <summary>Software / Sistema de Gestão <span class="count">0</span></summary>
+          <div class="cards-grid"></div>
+        </details>
+        <details open data-category="rede">
+          <summary>Rede / Conectividade <span class="count">0</span></summary>
+          <div class="cards-grid"></div>
+        </details>
+        <details open data-category="configuracao">
+          <summary>Configuração <span class="count">0</span></summary>
+          <div class="cards-grid"></div>
+        </details>
+        <details open data-category="diversos">
+          <summary>Diversos <span class="count">0</span></summary>
+          <div class="cards-grid"></div>
+        </details>
+        <details open data-category="queries">
+          <summary>Queries <span class="count">0</span></summary>
+          <div class="cards-grid"></div>
+        </details>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Novo/Editar Caso -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2 id="modal-titulo">Novo Caso</h2>
+      <div class="form-group">
+        <label>Título do problema</label>
+        <input type="text" id="campo-titulo" placeholder="Ex: Impressora não imprime">
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="campo-categoria">
+          <option value="hardware">Hardware</option>
+          <option value="software">Software / Sistema de Gestão</option>
+          <option value="rede">Rede / Conectividade</option>
+          <option value="configuracao">Configuração</option>
+          <option value="diversos">Diversos</option>
+          <option value="queries">Queries</option>
+        </select>
+      </div>
+      <div class="form-group" id="grupo-tags">
+        <label>Tags</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" value="urgente"> Urgente</label>
+          <label><input type="checkbox" value="frequente"> Frequente</label>
+          <label><input type="checkbox" value="resolvido"> Resolvido</label>
+          <label><input type="checkbox" value="pendente"> Pendente</label>
+        </div>
+      </div>
+      <div class="form-group" id="grupo-descricao">
+        <label id="label-descricao">Descrição do problema</label>
+        <textarea id="campo-descricao" placeholder="Descreva o que acontece..."></textarea>
+      </div>
+      <div class="form-group" id="grupo-query" style="display:none;">
+        <label>Queries</label>
+        <div class="linhas-queries" id="lista-queries"></div>
+        <button class="btn-add-query" type="button" onclick="adicionarLinhaQuery()">+ Adicionar query</button>
+      </div>
+      <div class="form-group" id="grupo-passos">
+        <label>Passo a passo da solução</label>
+        <textarea id="campo-passos" placeholder="1. Verificar...&#10;2. Reiniciar...&#10;3. ..." style="min-height: 100px;"></textarea>
+      </div>
+      <div class="form-group" id="grupo-comandos">
+        <label>Comandos úteis (um por linha)</label>
+        <textarea id="campo-comandos" placeholder="net stop spooler&#10;net start spooler"></textarea>
+      </div>
+      <div class="form-group" id="grupo-notas">
+        <label>Notas adicionais</label>
+        <textarea id="campo-notas" placeholder="Observações, links úteis, etc." style="min-height: 50px;"></textarea>
+      </div>
+      <div class="form-group" id="grupo-imagens">
+        <label>Imagens</label>
+        <div class="image-upload-area" id="upload-area">
+          Arraste imagens aqui ou clique para selecionar
+          <input type="file" id="campo-imagens" accept="image/*" multiple>
+        </div>
+        <div class="image-preview-container" id="image-preview"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarCaso()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox">
+    <img id="lightbox-img" src="" alt="Imagem ampliada">
+    <div class="lightbox-hint" id="lightbox-hint">Role p/ zoom · arraste p/ mover · clique p/ alternar</div>
+    <div class="lightbox-controls">
+      <button id="btn-menos" title="Reduzir">−</button>
+      <button id="btn-mais" title="Ampliar">+</button>
+      <button id="btn-reset" title="Ajustar à tela">⟲</button>
+      <button id="btn-download" title="Baixar imagem">↧</button>
+    </div>
+  </div>
+
+  <!-- Modal Novo/Editar Link -->
+  <div class="modal-overlay" id="modal-link">
+    <div class="modal">
+      <h2 id="modal-link-titulo">Novo Link</h2>
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" id="campo-link-nome" placeholder="Ex: Terminal Aurora Centro">
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="campo-link-categoria"></select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de link</label>
+        <div class="link-type-toggle">
+          <button class="active" onclick="alternarTipoLink('normal', this)">Link normal</button>
+          <button onclick="alternarTipoLink('ecommerce', this)">Ecommerce</button>
+        </div>
+      </div>
+      <div class="form-group" id="campo-link-url-group">
+        <label>URL</label>
+        <input type="url" id="campo-link-url" placeholder="https://exemplo.com">
+      </div>
+      <div class="ecommerce-fields" id="ecommerce-fields">
+        <div class="form-group">
+          <label>URL Base</label>
+          <input type="url" id="campo-link-urlbase" placeholder="https://painel.aurora.example/ecommerce/" oninput="atualizarPreviewEcommerce()">
+        </div>
+        <div class="form-group">
+          <label>Identificador do terminal</label>
+          <input type="text" id="campo-link-identificador" placeholder="aurora-centro" oninput="atualizarPreviewEcommerce()">
+        </div>
+        <div class="form-group">
+          <label>Preview</label>
+          <div class="url-preview" id="ecommerce-preview">—</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModalLink()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarLink()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Novo/Editar Contato -->
+  <div class="modal-overlay" id="modal-contato">
+    <div class="modal" style="max-width: 420px;">
+      <h2 id="modal-contato-titulo">Novo Contato</h2>
+      <div class="form-group">
+        <label>Nome do contato</label>
+        <input type="text" id="campo-contato-nome" placeholder="Ex: João da Silva">
+      </div>
+      <div class="form-group">
+        <label>Terminal / Empresa</label>
+        <input type="text" id="campo-contato-empresa" placeholder="Ex: Terminal Aurora Centro">
+      </div>
+      <div class="form-group" id="grupo-contato-localidade" style="display:none;">
+        <label>Localidade</label>
+        <input type="text" id="campo-contato-localidade" placeholder="Ex: Ponta Grossa">
+      </div>
+      <div class="form-group">
+        <label id="label-contato-numero">Telefone</label>
+        <input type="tel" id="campo-contato-telefone" placeholder="(11) 99999-9999">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModalContato()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarContato()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nova Categoria -->
+  <div class="modal-overlay" id="modal-categoria">
+    <div class="modal" style="max-width: 380px;">
+      <h2 id="modal-cat-titulo">Nova Categoria</h2>
+      <div class="form-group">
+        <label>Ícone (emoji)</label>
+        <input type="text" id="campo-cat-icone" placeholder="Ex: 📋" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label>Nome</label>
+        <input type="text" id="campo-cat-nome" placeholder="Ex: Meus Links">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModalCategoria()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarCategoria()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ═══ FIREBASE ═════════════════════════════════════════
+    // Firebase (config/init), db, auth e helpers comuns vêm de app-comum.js
+
+    // ═══ ESTADO ═══════════════════════════════════════════
+    const LS_STATE = 'aurora_desk_estado';
+    const LS_SCROLL = 'aurora_desk_scroll';
+    const LS_LINK_PANEL = 'aurora_desk_link_panel';
+    const MAX_IMAGE_WIDTH = 1920;
+    const MAX_IMAGE_HEIGHT = 1080;
+
+    let casos = [];
+    let editandoId = null;
+    let imagensTemp = [];
+    let links = [];
+    let linkCategorias = [];
+    let linkEditandoId = null;
+    let catEditandoId = null;
+    let linkTipoAtual = 'normal';
+    let catAtiva = null;
+    let unsubscribeCasos = null;
+    let unsubscribeLinks = null;
+    let unsubscribeCats = null;
+
+    // ═══ STATUS DE CONEXÃO ═══════════════════════════════
+    let syncEstado = 'syncing';
+    let usuarioNome = '';
+    function renderChip() {
+      const el = document.getElementById('sync-status');
+      el.className = 'sync-status ' + syncEstado;
+      el.textContent = '● ' + (usuarioNome || 'usuário');
+      el.title = 'Usuário: ' + (usuarioNome || '—') + ' — ' +
+        (syncEstado === 'online' ? 'Conectado' : syncEstado === 'syncing' ? 'Sincronizando' : 'Offline');
+    }
+    function setSyncStatus(status) {
+      syncEstado = status;
+      renderChip();
+    }
+
+    if (typeof db.enableNetwork === 'function') {
+      db.enableNetwork().then(() => setSyncStatus('online')).catch(() => setSyncStatus('offline'));
+    } else {
+      setSyncStatus('online');
+    }
+
+    // ═══ INICIALIZAÇÃO ════════════════════════════════════
+    async function init() {
+      carregarEstado();
+      restaurarScroll();
+      configurarBusca();
+      configurarCamposCategoria();
+      configurarUpload();
+      initLightbox();
+      escutarCasos();
+      escutarLinks();
+      escutarCategorias();
+    }
+
+    // ═══ FIREBASE: ESCUTAR DADOS EM TEMPO REAL ════════════
+    let _seedVerificado = false;
+    function escutarCasos() {
+      setSyncStatus('syncing');
+      unsubscribeCasos = db.collection('casos').onSnapshot(
+        snapshot => {
+          casos = [];
+          snapshot.forEach(doc => casos.push({ id: doc.id, ...doc.data() }));
+          if (casos.length === 0 && !_seedVerificado) {
+            _seedVerificado = true;
+            db.collection('config').doc('aplicacao').get()
+              .then(snap => {
+                if (snap.exists && snap.data().semeado) return;
+                getExemplos().forEach(c => db.collection('casos').doc(c.id).set(c).catch(() => {}));
+                return db.collection('config').doc('aplicacao').set({ semeado: true }, { merge: true });
+              })
+              .catch(err => console.error('Erro ao verificar semente:', err));
+          }
+          renderizarTodos();
+          setSyncStatus('online');
+        },
+        error => {
+          console.error('Erro ao escutar casos:', error);
+          setSyncStatus('offline');
+          const ls = localStorage.getItem('aurora_desk_casos_fallback');
+          if (ls) { try { casos = JSON.parse(ls); renderizarTodos(); } catch {} }
+        }
+      );
+    }
+
+    function escutarLinks() {
+      unsubscribeLinks = db.collection('links').onSnapshot(
+        snapshot => {
+          links = [];
+          snapshot.forEach(doc => links.push({ id: doc.id, ...doc.data() }));
+          renderizarLinksPainel();
+        },
+        error => {
+          console.error('Erro ao escutar links:', error);
+        }
+      );
+    }
+
+    function escutarCategorias() {
+      unsubscribeCats = db.collection('config').doc('categorias').onSnapshot(
+        doc => {
+          if (doc.exists && doc.data().lista) {
+            linkCategorias = doc.data().lista;
+          } else {
+            linkCategorias = getCategoriasPadrao();
+            db.collection('config').doc('categorias').set({ lista: linkCategorias }).catch(() => {});
+          }
+          renderizarCategoriasPainel();
+          renderizarLinksPainel();
+        },
+        error => {
+          console.error('Erro ao escutar categorias:', error);
+          linkCategorias = getCategoriasPadrao();
+          renderizarCategoriasPainel();
+        }
+      );
+    }
+
+    // ═══ FIREBASE: SALVAR DADOS ═══════════════════════════
+    async function salvarCasoFirestore(caso) {
+      try {
+        await db.collection('casos').doc(caso.id).set(caso);
+        fallbackSalvarCasos();
+        return true;
+      } catch (e) {
+        console.error('Erro ao salvar caso:', e);
+        showToast('Erro ao salvar o caso: ' + (e && e.message ? e.message : e));
+        return false;
+      }
+    }
+
+    async function excluirCasoFirestore(id) {
+      try {
+        await db.collection('casos').doc(id).delete();
+        return true;
+      } catch (e) {
+        console.error('Erro ao excluir caso:', e);
+        showToast('Erro ao excluir o caso: ' + (e && e.message ? e.message : e));
+        return false;
+      }
+    }
+
+    async function salvarLinkFirestore(link) {
+      try {
+        await db.collection('links').doc(link.id).set(link);
+        return true;
+      } catch (e) {
+        console.error('Erro ao salvar link:', e);
+        showToast('Erro ao salvar o link: ' + (e && e.message ? e.message : e));
+        return false;
+      }
+    }
+
+    async function excluirLinkFirestore(id) {
+      try {
+        await db.collection('links').doc(id).delete();
+        return true;
+      } catch (e) {
+        console.error('Erro ao excluir link:', e);
+        showToast('Erro ao excluir o link: ' + (e && e.message ? e.message : e));
+        return false;
+      }
+    }
+
+    async function salvarCategoriasFirestore() {
+      try {
+        await db.collection('config').doc('categorias').set({ lista: linkCategorias });
+      } catch (e) {
+        console.error('Erro ao salvar categorias:', e);
+      }
+    }
+
+    function fallbackSalvarCasos() {
+      localStorage.setItem('aurora_desk_casos_fallback', JSON.stringify(casos));
+    }
+
+    // ═══ PERSISTÊNCIA DE ESTADO (localStorage - por usuário) ═══
+    function carregarEstado() {
+      try {
+        const estado = JSON.parse(localStorage.getItem(LS_STATE));
+        if (estado) {
+          document.querySelectorAll('details[data-category]').forEach(det => {
+            const cat = det.getAttribute('data-category');
+            if (estado[cat] !== undefined) det.open = estado[cat];
+          });
+        }
+      } catch {}
+    }
+
+    function salvarEstado() {
+      const estado = {};
+      document.querySelectorAll('details[data-category]').forEach(det => {
+        estado[det.getAttribute('data-category')] = det.open;
+      });
+      localStorage.setItem(LS_STATE, JSON.stringify(estado));
+    }
+
+    document.querySelectorAll('details[data-category]').forEach(det => {
+      det.addEventListener('toggle', salvarEstado);
+    });
+
+    function salvarScroll() {
+      const mainEl = document.querySelector('.main-content');
+      if (mainEl) localStorage.setItem(LS_SCROLL, mainEl.scrollTop.toString());
+    }
+
+    function restaurarScroll() {
+      const y = localStorage.getItem(LS_SCROLL);
+      const mainEl = document.querySelector('.main-content');
+      if (y && mainEl) mainEl.scrollTop = parseInt(y);
+    }
+
+    document.querySelector('.main-content')?.addEventListener('beforeunload', salvarScroll);
+
+    // ═══ RENDERIZAÇÃO ═════════════════════════════════════
+    function renderizarTodos() {
+      document.querySelectorAll('details[data-category]').forEach(det => {
+        const cat = det.getAttribute('data-category');
+        const grid = det.querySelector('.cards-grid');
+        const casosCat = casos.filter(c => c.categoria === cat);
+        grid.innerHTML = '';
+        casosCat.forEach(c => grid.appendChild(criarCard(c)));
+        det.querySelector('.count').textContent = casosCat.length;
+      });
+    }
+
+    function criarCard(caso) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.setAttribute('data-id', caso.id);
+
+      const tagsHtml = (caso.tags || []).map(t =>
+        `<span class="tag tag-${t}">${t}</span>`
+      ).join('');
+
+      const passosHtml = caso.passos
+        ? `<ol class="passos">${caso.passos.split('\n').filter(l => l.trim()).map(l => `<li>${escapeHtml(l.replace(/^\d+[\.\)]\s*/, ''))}</li>`).join('')}</ol>`
+        : '';
+
+      const comandosHtml = caso.comandos
+        ? caso.comandos.split('\n').filter(l => l.trim()).map(cmd =>
+          `<div class="comando-block">
+            <code>${escapeHtml(cmd.trim())}</code>
+            <button class="btn-copiar" onclick="copiarComando(this, '${escapeAttr(cmd.trim())}')">Copiar</button>
+          </div>`
+        ).join('')
+        : '';
+
+      const listaQueries = (Array.isArray(caso.queries) ? caso.queries
+        : (caso.query ? [{ resumo: '', query: caso.query }] : []))
+        .filter(q => q && q.query);
+
+      const queryHtml = listaQueries.length
+        ? '<div class="query-blocks">' + listaQueries.map((q, i) =>
+            '<div class="query-item">' +
+              '<div class="query-head">' +
+                '<span class="query-resumo">' + escapeHtml(q.resumo || ('Query ' + (i + 1))) + '</span>' +
+                '<span class="query-head-spacer"></span>' +
+                '<button type="button" class="btn-copy-query">Copiar</button>' +
+              '</div>' +
+              '<pre class="query-code">' + escapeHtml(q.query) + '</pre>' +
+            '</div>').join('') + '</div>'
+        : '';
+
+      const imagensHtml = caso.imagens && caso.imagens.length > 0
+        ? `<div class="card-images">${caso.imagens.map(img =>
+          `<img src="${img}" alt="Imagem do caso" loading="lazy" onclick="abrirLightbox('${img.replace(/'/g, "\\'")}')">`
+        ).join('')}</div>`
+        : '';
+
+      const notasHtml = caso.notas
+        ? `<div class="descricao" style="font-style:italic; margin-top: 4px;">${escapeHtml(caso.notas)}</div>`
+        : '';
+
+      div.innerHTML = `
+        <div class="card-header">
+          <h3>${escapeHtml(caso.titulo || '')}</h3>
+          <div class="card-actions">
+            <button onclick="editarCaso('${caso.id}')" title="Editar">✏️</button>
+            <button class="excluir" onclick="excluirCaso('${caso.id}')" title="Excluir">🗑️</button>
+          </div>
+        </div>
+        <div class="tags">${tagsHtml}</div>
+        <div class="descricao">${escapeHtml(caso.descricao || '')}</div>
+        ${passosHtml}
+        ${queryHtml}
+        ${comandosHtml}
+        ${imagensHtml}
+        ${notasHtml}
+        <div class="card-date">${formatarData(caso.data)}</div>
+      `;
+
+      if (queryHtml) {
+        div.querySelectorAll('.query-item').forEach(item => {
+          const botao = item.querySelector('.btn-copy-query');
+          botao.addEventListener('click', () => copiarComando(botao, item.querySelector('.query-code').textContent));
+        });
+      }
+
+      return div;
+    }
+
+    function formatarData(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ═══ QUERIES (múltiplas, mesmo padrão do chamados.html) ═══
+    function adicionarLinhaQuery(resumo, query) {
+      const container = document.getElementById('lista-queries');
+      const linha = document.createElement('div');
+      linha.className = 'linha-query';
+      linha.innerHTML = `
+        <div class="linha-query-topo">
+          <input type="text" class="campo-query-resumo" placeholder="Resumo do que a query busca" value="${escapeHtml(resumo || '').replace(/"/g, '&quot;')}">
+          <button type="button" class="btn-remove-query" onclick="this.parentElement.parentElement.remove()">Remover</button>
+        </div>
+        <textarea class="campo-query-sql" placeholder="SELECT TOP 100 * FROM ..."></textarea>
+      `;
+      if (query) linha.querySelector('.campo-query-sql').value = query;
+      container.appendChild(linha);
+    }
+
+    function carregarLinhasQuery(caso) {
+      const container = document.getElementById('lista-queries');
+      container.innerHTML = '';
+      const lista = Array.isArray(caso.queries) ? caso.queries
+        : (caso.query ? [{ resumo: '', query: caso.query }] : []);
+      lista.forEach(q => adicionarLinhaQuery((q && q.resumo) || '', (q && q.query) || ''));
+    }
+
+    // ═══ BUSCA ════════════════════════════════════════════
+    function alternarCamposPorCategoria() {
+      const ehQuery = document.getElementById('campo-categoria').value === 'queries';
+      ['grupo-tags', 'grupo-passos', 'grupo-comandos', 'grupo-notas', 'grupo-imagens'].forEach(id => {
+        document.getElementById(id).style.display = ehQuery ? 'none' : '';
+      });
+      document.getElementById('grupo-query').style.display = ehQuery ? '' : 'none';
+      document.getElementById('label-descricao').textContent =
+        ehQuery ? 'Descrição da Query' : 'Descrição do problema';
+    }
+
+    function configurarCamposCategoria() {
+      document.getElementById('campo-categoria').addEventListener('change', alternarCamposPorCategoria);
+    }
+
+    function configurarBusca() {
+      const input = document.getElementById('busca');
+      input.addEventListener('input', () => {
+        const termo = input.value.toLowerCase().trim();
+        let totalVisiveis = 0;
+        document.querySelectorAll('.card').forEach(card => {
+          const match = !termo || card.textContent.toLowerCase().includes(termo);
+          card.classList.toggle('hidden', !match);
+          if (match) totalVisiveis++;
+        });
+        document.querySelectorAll('details[data-category]').forEach(det => {
+          const visiveis = det.querySelectorAll('.card:not(.hidden)').length;
+          det.style.display = visiveis === 0 && termo ? 'none' : '';
+        });
+        document.getElementById('result-count').textContent = termo ? `${totalVisiveis} resultado(s)` : '';
+      });
+    }
+
+    // ═══ MODAL CASO ═══════════════════════════════════════
+    function abrirModal(id) {
+      editandoId = id || null;
+      imagensTemp = [];
+      if (id) {
+        const caso = casos.find(c => c.id === id);
+        if (!caso) return;
+        document.getElementById('modal-titulo').textContent = 'Editar Caso';
+        document.getElementById('campo-titulo').value = caso.titulo || '';
+        document.getElementById('campo-categoria').value = caso.categoria || 'hardware';
+        document.getElementById('campo-descricao').value = caso.descricao || '';
+        carregarLinhasQuery(caso);
+        document.getElementById('campo-passos').value = caso.passos || '';
+        document.getElementById('campo-comandos').value = caso.comandos || '';
+        document.getElementById('campo-notas').value = caso.notas || '';
+        imagensTemp = caso.imagens ? [...caso.imagens] : [];
+        document.querySelectorAll('.checkbox-group input').forEach(cb => {
+          cb.checked = (caso.tags || []).includes(cb.value);
+        });
+      } else {
+        document.getElementById('modal-titulo').textContent = 'Novo Caso';
+        document.getElementById('campo-titulo').value = '';
+        document.getElementById('campo-categoria').value = 'hardware';
+        document.getElementById('campo-descricao').value = '';
+        document.getElementById('lista-queries').innerHTML = '';
+        document.getElementById('campo-passos').value = '';
+        document.getElementById('campo-comandos').value = '';
+        document.getElementById('campo-notas').value = '';
+        document.querySelectorAll('.checkbox-group input').forEach(cb => { cb.checked = false; });
+      }
+      renderizarPreviewImagens();
+      alternarCamposPorCategoria();
+      document.getElementById('modal').classList.add('active');
+      document.getElementById('campo-titulo').focus();
+    }
+
+    function fecharModal() {
+      document.getElementById('modal').classList.remove('active');
+      editandoId = null;
+      imagensTemp = [];
+    }
+
+    async function salvarCaso() {
+      const titulo = document.getElementById('campo-titulo').value.trim();
+      const categoria = document.getElementById('campo-categoria').value;
+      const descricao = document.getElementById('campo-descricao').value.trim();
+      const queries = [...document.querySelectorAll('#lista-queries .linha-query')].map(linha => {
+        const resumo = linha.querySelector('.campo-query-resumo').value.trim();
+        const query = linha.querySelector('.campo-query-sql').value.trim();
+        if (!query) return null;
+        return { resumo, query };
+      }).filter(Boolean);
+      const passos = document.getElementById('campo-passos').value.trim();
+      const comandos = document.getElementById('campo-comandos').value.trim();
+      const notas = document.getElementById('campo-notas').value.trim();
+      const tags = [...document.querySelectorAll('.checkbox-group input:checked')].map(cb => cb.value);
+
+      if (!titulo) { alert('Informe o título do problema.'); return; }
+
+      const bytesImagens = tamanhoImagensBytes(imagensTemp);
+      if (bytesImagens > MAX_IMAGENS_DOC) {
+        alert(
+          `As imagens deste caso somam ${Math.ceil(bytesImagens / 1024)} KB e o limite por registro é 900 KB.\n` +
+          'Remova algumas imagens para conseguir salvar.'
+        );
+        return;
+      }
+
+      let caso;
+      if (editandoId) {
+        const idx = casos.findIndex(c => c.id === editandoId);
+        if (idx !== -1) {
+          caso = { ...casos[idx], titulo, categoria, descricao, queries, passos, comandos, notas, tags, imagens: [...imagensTemp] };
+        }
+      } else {
+        caso = { id: gerarId(), titulo, categoria, descricao, queries, passos, comandos, notas, tags, imagens: [...imagensTemp], data: new Date().toISOString() };
+      }
+
+      if (caso && 'query' in caso) delete caso.query;
+      if (caso && usuarioAtual && !caso.ownerUid) caso.ownerUid = usuarioAtual.uid;
+      if (caso) {
+        const ok = await salvarCasoFirestore(caso);
+        if (!ok) return;
+      }
+      fecharModal();
+    }
+
+    function editarCaso(id) { abrirModal(id); }
+
+    async function excluirCaso(id) {
+      if (!confirm('Tem certeza que deseja excluir este caso?')) return;
+      await excluirCasoFirestore(id);
+    }
+
+    // ═══ IMAGENS ═══════════════════════════════════════════
+    function configurarUpload() {
+      const input = document.getElementById('campo-imagens');
+      const area = document.getElementById('upload-area');
+      input.addEventListener('change', (e) => { processarArquivos(e.target.files); input.value = ''; });
+      area.addEventListener('dragover', (e) => { e.preventDefault(); area.style.borderColor = 'var(--accent)'; });
+      area.addEventListener('dragleave', () => { area.style.borderColor = ''; });
+      area.addEventListener('drop', (e) => { e.preventDefault(); area.style.borderColor = ''; processarArquivos(e.dataTransfer.files); });
+    }
+
+    function processarArquivos(files) {
+      [...files].forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        if (file.size > 2 * 1024 * 1024) { alert(`Imagem "${file.name}" é muito grande (máx. 2MB).`); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          redimensionarImagem(e.target.result, (resized) => { imagensTemp.push(resized); renderizarPreviewImagens(); });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function redimensionarImagem(dataUrl, callback) {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > MAX_IMAGE_WIDTH) { h = (h * MAX_IMAGE_WIDTH) / w; w = MAX_IMAGE_WIDTH; }
+        if (h > MAX_IMAGE_HEIGHT) { w = (w * MAX_IMAGE_HEIGHT) / h; h = MAX_IMAGE_HEIGHT; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const webp = canvas.toDataURL('image/webp', 0.8);
+        if (webp.length > 50) {
+          callback(webp);
+        } else {
+          callback(canvas.toDataURL('image/jpeg', 0.92));
+        }
+      };
+      img.src = dataUrl;
+    }
+
+    function renderizarPreviewImagens() {
+      const container = document.getElementById('image-preview');
+      container.innerHTML = '';
+      imagensTemp.forEach((img, i) => {
+        const item = document.createElement('div');
+        item.className = 'image-preview-item';
+        item.innerHTML = `<img src="${img}" alt="Preview" loading="lazy"><button onclick="removerImagemTemp(${i})">✕</button>`;
+        container.appendChild(item);
+      });
+    }
+
+    function removerImagemTemp(index) { imagensTemp.splice(index, 1); renderizarPreviewImagens(); }
+
+    // ═══ LIGHTBOX COM ZOOM ══════════════════════════════════
+    let lbEscala = 1, lbTx = 0, lbTy = 0;
+    let lbArrastando = false, lbMoveu = false, lbInicio = null, lbPanInicio = null;
+
+    function lbAplicar() {
+      const img = document.getElementById('lightbox-img');
+      img.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbEscala})`;
+      document.getElementById('btn-menos').disabled = lbEscala <= 1;
+      document.getElementById('btn-mais').disabled = lbEscala >= 8;
+    }
+
+    function abrirLightbox(src) {
+      lbEscala = 1; lbTx = 0; lbTy = 0;
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox').classList.add('active');
+      document.getElementById('lightbox-hint').style.display = 'block';
+      lbAplicar();
+    }
+
+    function fecharLightbox() {
+      document.getElementById('lightbox').classList.remove('active');
+      lbEscala = 1; lbTx = 0; lbTy = 0;
+    }
+
+    function lbZoomPasso(delta) {
+      lbEscala = Math.min(8, Math.max(1, Math.round((lbEscala + delta) * 100) / 100));
+      lbAplicar();
+    }
+
+    function lbBaixar() {
+      const img = document.getElementById('lightbox-img');
+      const link = document.createElement('a');
+      link.href = img.src;
+      link.download = img.src.indexOf('image/webp') > -1 ? 'imagem.webp' : 'imagem.jpg';
+      link.click();
+    }
+
+    function initLightbox() {
+      const lb = document.getElementById('lightbox');
+      const img = document.getElementById('lightbox-img');
+
+      img.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        lbZoomPasso(e.deltaY < 0 ? 0.5 : -0.5);
+      }, { passive: false });
+
+      img.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        lbArrastando = true; lbMoveu = false;
+        lbInicio = { x: e.clientX, y: e.clientY };
+        lbPanInicio = { tx: lbTx, ty: lbTy };
+        img.style.cursor = 'grabbing';
+      });
+      lb.addEventListener('mousemove', (e) => {
+        if (!lbArrastando) return;
+        const dx = e.clientX - lbInicio.x, dy = e.clientY - lbInicio.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) lbMoveu = true;
+        if (lbEscala > 1) {
+          lbTx = lbPanInicio.tx + dx;
+          lbTy = lbPanInicio.ty + dy;
+          lbAplicar();
+        }
+      });
+      lb.addEventListener('mouseup', () => {
+        if (lbArrastando) {
+          if (!lbMoveu) {
+            if (lbEscala > 1) { lbEscala = 1; lbTx = 0; lbTy = 0; }
+            else { lbEscala = 2.5; }
+            lbAplicar();
+          }
+          img.style.cursor = '';
+          lbArrastando = false;
+        }
+      });
+
+      let toqueInicio = null;
+      img.addEventListener('touchstart', (e) => {
+        const t = e.touches[0];
+        toqueInicio = { x: t.clientX, y: t.clientY, tx: lbTx, ty: lbTy };
+        lbMoveu = false;
+      }, { passive: true });
+      img.addEventListener('touchmove', (e) => {
+        if (!toqueInicio) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        const dx = t.clientX - toqueInicio.x, dy = t.clientY - toqueInicio.y;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) lbMoveu = true;
+        if (lbEscala > 1) {
+          lbTx = toqueInicio.tx + dx;
+          lbTy = toqueInicio.ty + dy;
+          lbAplicar();
+        }
+      }, { passive: false });
+      img.addEventListener('touchend', () => {
+        if (toqueInicio && !lbMoveu) {
+          if (lbEscala > 1) { lbEscala = 1; lbTx = 0; lbTy = 0; }
+          else { lbEscala = 2.5; }
+          lbAplicar();
+        }
+        toqueInicio = null;
+      });
+
+      document.getElementById('btn-menos').addEventListener('click', (e) => { e.stopPropagation(); lbZoomPasso(-0.5); });
+      document.getElementById('btn-mais').addEventListener('click', (e) => { e.stopPropagation(); lbZoomPasso(0.5); });
+      document.getElementById('btn-reset').addEventListener('click', (e) => { e.stopPropagation(); lbEscala = 1; lbTx = 0; lbTy = 0; lbAplicar(); });
+      document.getElementById('btn-download').addEventListener('click', (e) => { e.stopPropagation(); lbBaixar(); });
+
+      lb.addEventListener('click', (e) => { if (e.target === lb) fecharLightbox(); });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { fecharLightbox(); fecharModal(); fecharModalLink(); fecharModalContato(); fecharModalCategoria(); }
+    });
+
+    // ═══ COPIAR COMANDO ════════════════════════════════════
+    function copiarComando(btn, texto) {
+      copiarTexto(texto).then(() => {
+        const original = btn.textContent;
+        btn.textContent = 'Copiado!';
+        setTimeout(() => btn.textContent = original, 1500);
+      });
+    }
+
+    function copiarTelefone(numero, rotulo) {
+      copiarTexto(numero).then(() => {
+        showToast((rotulo || 'Número') + ' copiado: ' + numero);
+      });
+    }
+
+    function copiarTexto(texto) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(texto).catch(() => fallbackCopiar(texto));
+      }
+      return fallbackCopiar(texto);
+    }
+
+    function fallbackCopiar(texto) {
+      return new Promise(resolve => {
+        const ta = document.createElement('textarea');
+        ta.value = texto;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 2000);
+    }
+
+    // ═══ UTILITÁRIOS ══════════════════════════════════════
+    // escapeHtml() (global) vem de app-comum.js
+
+    // Limite de imagens por doc (Firestore = 1MiB/doc; 900KB deixa folga pro texto)
+    const MAX_IMAGENS_DOC = 900 * 1024;
+    function tamanhoImagensBytes(imagens) {
+      return (imagens || []).reduce((total, src) => {
+        if (typeof src !== 'string') return total;
+        const virgula = src.indexOf(',');
+        const corpo = virgula >= 0 ? src.slice(virgula + 1) : src;
+        return total + Math.ceil(corpo.length * 0.75);
+      }, 0);
+    }
+    function escapeAttr(str) { return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+    function gerarId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+    // ═══ PAINEL DE LINKS ══════════════════════════════════
+    function togglePanel() {
+      const panel = document.getElementById('links-panel');
+      const isMobile = window.innerWidth <= 700;
+      if (isMobile) {
+        panel.classList.toggle('mobile-open');
+        document.getElementById('mobile-overlay').classList.toggle('active', panel.classList.contains('mobile-open'));
+      } else {
+        panel.classList.toggle('expanded');
+        localStorage.setItem(LS_LINK_PANEL, panel.classList.contains('expanded') ? '1' : '0');
+      }
+    }
+
+    function fecharPanelMobile() {
+      document.getElementById('links-panel').classList.remove('mobile-open');
+      document.getElementById('mobile-overlay').classList.remove('active');
+    }
+
+    (function carregarEstadoPainel() {
+      if (localStorage.getItem(LS_LINK_PANEL) === '1' && window.innerWidth > 700) {
+        document.getElementById('links-panel').classList.add('expanded');
+      }
+    })();
+
+    function renderizarCategoriasPainel() {
+      const container = document.getElementById('panel-categories');
+      container.innerHTML = '';
+      linkCategorias.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.className = 'panel-cat-btn' + (catAtiva === cat.id ? ' active' : '');
+        btn.title = cat.nome;
+        btn.innerHTML = `<span>${cat.icone}</span><span class="cat-label">${escapeHtml(cat.nome)}</span><span class="cat-count">${links.filter(l => l.categoriaId === cat.id).length}</span>`;
+        btn.onclick = () => selecionarCategoria(cat.id);
+        container.appendChild(btn);
+      });
+    }
+
+    function selecionarCategoria(id) {
+      catAtiva = catAtiva === id ? null : id;
+      renderizarCategoriasPainel();
+      renderizarLinksPainel();
+      atualizarBotaoAdicionar();
+      const panel = document.getElementById('links-panel');
+      if (!panel.classList.contains('expanded') && window.innerWidth > 700) {
+        panel.classList.add('expanded');
+        localStorage.setItem(LS_LINK_PANEL, '1');
+      }
+    }
+
+    function modoCategoria(catId) {
+      const cat = linkCategorias.find(c => c.id === catId);
+      const nome = (cat && cat.nome ? cat.nome.toLowerCase() : '');
+      if (nome === 'contatos') return 'contato';
+      if (nome === 'anydesk' || nome === 'anydesks') return 'anydesk';
+      if (nome === 'totem' || nome === 'totems') return 'totem';
+      return 'link';
+    }
+
+    function isCategoriaContatos(catId) {
+      return modoCategoria(catId) === 'contato';
+    }
+
+    function isCategoriaAnyDesk(catId) {
+      return modoCategoria(catId) === 'anydesk';
+    }
+
+    function idCategoriaAnyDesk() {
+      const cat = linkCategorias.find(c => {
+        const nome = (c.nome || '').toLowerCase();
+        return nome === 'anydesk' || nome === 'anydesks';
+      });
+      return cat ? cat.id : null;
+    }
+
+    function idCategoriaTotem() {
+      const cat = linkCategorias.find(c => {
+        const nome = (c.nome || '').toLowerCase();
+        return nome === 'totem' || nome === 'totems';
+      });
+      return cat ? cat.id : null;
+    }
+
+    function atualizarBotaoAdicionar() {
+      const btn = document.getElementById('panel-add-btn');
+      const modo = catAtiva ? modoCategoria(catAtiva) : 'link';
+      if (modo === 'contato') btn.textContent = '+ Novo Contato';
+      else if (modo === 'anydesk') btn.textContent = '+ Novo AnyDesk';
+      else if (modo === 'totem') btn.textContent = '+ Novo Totem';
+      else btn.textContent = '+ Novo Link';
+    }
+
+    function abrirModalAdicionar() {
+      const modo = catAtiva ? modoCategoria(catAtiva) : 'link';
+      if (modo === 'contato') abrirModalContato();
+      else if (modo === 'anydesk') abrirModalAnyDesk();
+      else if (modo === 'totem') abrirModalTotem();
+      else abrirModalLink();
+    }
+
+    function atualizarFiltroLocalidade() {
+      const wrap = document.getElementById('filtro-localidade-wrap');
+      const select = document.getElementById('filtro-localidade');
+      if (!wrap || !select) return;
+      const modo = catAtiva ? modoCategoria(catAtiva) : 'link';
+      if (modo !== 'totem') {
+        wrap.style.display = 'none';
+        return;
+      }
+      wrap.style.display = 'block';
+      const atual = select.value;
+      const localidades = [...new Set(links
+        .filter(l => l.categoriaId === catAtiva)
+        .map(l => (l.localidade || '').trim()))];
+      select.innerHTML = '<option value="">Todas as localidades</option>';
+      localidades.sort((a, b) => a.localeCompare(b));
+      localidades.forEach(loc => {
+        const valor = loc || '__sem__';
+        const rotulo = loc || '(sem localidade)';
+        select.innerHTML += `<option value="${escapeAttr(valor)}">${escapeHtml(rotulo)}</option>`;
+      });
+      if (atual && [...select.options].some(o => o.value === atual)) select.value = atual;
+    }
+
+    function renderizarLinksPainel() {
+      const container = document.getElementById('panel-links-list');
+      atualizarFiltroLocalidade();
+      const termo = (document.getElementById('busca-links')?.value || '').toLowerCase().trim();
+      const filtroLoc = document.getElementById('filtro-localidade')?.value || '';
+      let filtrados = links;
+      if (catAtiva) filtrados = filtrados.filter(l => l.categoriaId === catAtiva);
+      if (filtroLoc) filtrados = filtrados.filter(l => {
+        const loc = (l.localidade || '').trim();
+        return (filtroLoc === '__sem__') ? loc === '' : loc.toLowerCase() === filtroLoc.toLowerCase();
+      });
+      if (termo) filtrados = filtrados.filter(l => {
+        const texto = (l.nome + ' ' + (l.empresa || '') + ' ' + (l.localidade || '') + ' ' + (l.telefone || '') + ' ' + montarUrlLink(l)).toLowerCase();
+        return texto.includes(termo);
+      });
+
+      container.innerHTML = '';
+      if (filtrados.length === 0) {
+        const modo = catAtiva ? modoCategoria(catAtiva) : 'link';
+        let vazio;
+        if (modo === 'contato') vazio = 'Nenhum contato cadastrado';
+        else if (modo === 'anydesk') vazio = 'Nenhum AnyDesk cadastrado';
+        else if (modo === 'totem') vazio = filtroLoc ? 'Nenhum totem nesta localidade' : 'Nenhum totem cadastrado';
+        else vazio = catAtiva ? 'Nenhum link nesta categoria' : 'Nenhum item cadastrado';
+        container.innerHTML = `<div class="panel-empty-msg">${vazio}</div>`;
+        renderizarCategoriasPainel();
+        return;
+      }
+
+      const agrupados = {};
+      filtrados.forEach(l => {
+        const cat = linkCategorias.find(c => c.id === l.categoriaId);
+        const catNome = cat ? cat.nome : 'Sem categoria';
+        if (!agrupados[catNome]) agrupados[catNome] = [];
+        agrupados[catNome].push(l);
+      });
+
+      Object.keys(agrupados).sort().forEach(catNome => {
+        if (!catAtiva) {
+          const header = document.createElement('div');
+          header.className = 'panel-cat-header';
+          header.textContent = catNome;
+          container.appendChild(header);
+        }
+        agrupados[catNome].forEach(link => {
+          let item;
+
+          const ehItemEspecial = link.tipo === 'contato' || link.tipo === 'anydesk' || link.tipo === 'totem' ||
+            (!link.tipo && link.categoriaId && modoCategoria(link.categoriaId) !== 'link');
+
+          if (ehItemEspecial) {
+            const localidade = (link.tipo === 'totem' && link.localidade) ? link.localidade : '';
+            const rotuloCopia = (link.tipo === 'anydesk' || link.tipo === 'totem') ? 'Código' : 'Número';
+            item = document.createElement('div');
+            item.className = 'panel-link-item contato-item';
+            item.innerHTML = `
+              <div class="contato-info">
+                <span class="contato-nome">${escapeHtml(link.nome)}</span>
+                <span class="contato-empresa">${escapeHtml(link.empresa || '')}${localidade ? ' · ' + escapeHtml(localidade) : ''}</span>
+              </div>
+              <div class="comando-block contato-telefone">
+                <code>${escapeHtml(link.telefone || '')}</code>
+                <button class="btn-copiar" onclick="event.stopPropagation();copiarTelefone('${escapeAttr(link.telefone || '')}', '${rotuloCopia}')">Copiar</button>
+              </div>
+              <span class="link-actions">
+                <button onclick="event.preventDefault();event.stopPropagation();editarLink('${link.id}')" title="Editar">✏️</button>
+                <button class="excluir-link" onclick="event.preventDefault();event.stopPropagation();excluirLink('${link.id}')" title="Excluir">🗑️</button>
+              </span>
+            `;
+          } else {
+            const url = montarUrlLink(link);
+            item = document.createElement('a');
+            item.className = 'panel-link-item';
+            item.href = url;
+            item.target = '_blank';
+            item.rel = 'noopener';
+            item.innerHTML = `
+              <span class="link-name">${escapeHtml(link.nome)}</span>
+              <span class="link-url-preview">${escapeHtml(url)}</span>
+              <span class="link-actions">
+                <button onclick="event.preventDefault();event.stopPropagation();editarLink('${link.id}')" title="Editar">✏️</button>
+                <button class="excluir-link" onclick="event.preventDefault();event.stopPropagation();excluirLink('${link.id}')" title="Excluir">🗑️</button>
+              </span>
+            `;
+          }
+          container.appendChild(item);
+        });
+      });
+      renderizarCategoriasPainel();
+    }
+
+    function montarUrlLink(link) {
+      if (link.tipo === 'ecommerce' && link.urlBase) return link.urlBase.replace(/\/$/, '') + '/' + (link.identificador || '');
+      return link.url || '';
+    }
+
+    function buscarLinks() { renderizarLinksPainel(); }
+
+    function getCategoriasPadrao() {
+      return [
+        { id: 'ecommerce', nome: 'Ecommerce', icone: '🛒', padrao: true },
+        { id: 'contatos', nome: 'Contatos', icone: '📞', padrao: true },
+        { id: 'sites', nome: 'Sites úteis', icone: '🌐', padrao: true },
+        { id: 'ferramentas', nome: 'Ferramentas', icone: '🔧', padrao: true },
+        { id: 'internos', nome: 'Internos', icone: '📁', padrao: true }
+      ];
+    }
+
+    // ═══ CRUD CATEGORIAS ══════════════════════════════════
+    function abrirModalCategoria(id) {
+      catEditandoId = id || null;
+      if (id) {
+        const cat = linkCategorias.find(c => c.id === id);
+        if (!cat) return;
+        document.getElementById('modal-cat-titulo').textContent = 'Editar Categoria';
+        document.getElementById('campo-cat-icone').value = cat.icone;
+        document.getElementById('campo-cat-nome').value = cat.nome;
+      } else {
+        document.getElementById('modal-cat-titulo').textContent = 'Nova Categoria';
+        document.getElementById('campo-cat-icone').value = '';
+        document.getElementById('campo-cat-nome').value = '';
+      }
+      document.getElementById('modal-categoria').classList.add('active');
+      document.getElementById('campo-cat-nome').focus();
+    }
+
+    function fecharModalCategoria() { document.getElementById('modal-categoria').classList.remove('active'); catEditandoId = null; }
+
+    async function salvarCategoria() {
+      const icone = document.getElementById('campo-cat-icone').value.trim() || '📁';
+      const nome = document.getElementById('campo-cat-nome').value.trim();
+      if (!nome) { alert('Informe o nome da categoria.'); return; }
+
+      if (catEditandoId) {
+        const idx = linkCategorias.findIndex(c => c.id === catEditandoId);
+        if (idx !== -1) { linkCategorias[idx].icone = icone; linkCategorias[idx].nome = nome; }
+      } else {
+        linkCategorias.push({ id: gerarId(), nome, icone, padrao: false });
+      }
+
+      await salvarCategoriasFirestore();
+      fecharModalCategoria();
+    }
+
+    async function excluirCategoria(id) {
+      const cat = linkCategorias.find(c => c.id === id);
+      if (cat && cat.padrao) { alert('Não é possível excluir categorias padrão.'); return; }
+      if (!confirm('Excluir esta categoria? Links nela ficarão sem categoria.')) return;
+      linkCategorias = linkCategorias.filter(c => c.id !== id);
+      links.forEach(l => { if (l.categoriaId === id) l.categoriaId = null; });
+      if (catAtiva === id) catAtiva = null;
+      await salvarCategoriasFirestore();
+      links.forEach(l => { if (!l.categoriaId) salvarLinkFirestore(l); });
+    }
+
+    // ═══ CRUD CONTATOS ═════════════════════════════════════
+    function abrirModalContato(id) {
+      linkEditandoId = id || null;
+      document.getElementById('label-contato-numero').textContent = 'Telefone';
+      document.getElementById('grupo-contato-localidade').style.display = 'none';
+      const inputNum = document.getElementById('campo-contato-telefone');
+      inputNum.type = 'tel';
+      inputNum.placeholder = '(11) 99999-9999';
+      if (id) {
+        const link = links.find(l => l.id === id);
+        if (!link) return;
+        document.getElementById('modal-contato-titulo').textContent = 'Editar Contato';
+        document.getElementById('campo-contato-nome').value = link.nome || '';
+        document.getElementById('campo-contato-empresa').value = link.empresa || '';
+        document.getElementById('campo-contato-telefone').value = link.telefone || '';
+      } else {
+        document.getElementById('modal-contato-titulo').textContent = 'Novo Contato';
+        document.getElementById('campo-contato-nome').value = '';
+        document.getElementById('campo-contato-empresa').value = '';
+        document.getElementById('campo-contato-telefone').value = '';
+      }
+      document.getElementById('modal-contato').classList.add('active');
+      document.getElementById('campo-contato-nome').focus();
+    }
+
+    function fecharModalContato() {
+      document.getElementById('modal-contato').classList.remove('active');
+      linkEditandoId = null;
+    }
+
+    async function salvarContato() {
+      const nome = document.getElementById('campo-contato-nome').value.trim();
+      const empresa = document.getElementById('campo-contato-empresa').value.trim();
+      const telefone = document.getElementById('campo-contato-telefone').value.trim();
+
+      if (!nome) { alert('Informe o nome do contato.'); return; }
+      if (!telefone) { alert('Informe o telefone.'); return; }
+
+      const categoriaId = catAtiva || 'contatos';
+
+      let link;
+      if (linkEditandoId) {
+        const idx = links.findIndex(l => l.id === linkEditandoId);
+        if (idx !== -1) link = { ...links[idx], nome, empresa, telefone, categoriaId, tipo: 'contato' };
+      } else {
+        link = { id: gerarId(), nome, empresa, telefone, categoriaId, tipo: 'contato' };
+      }
+
+      if (link) await salvarLinkFirestore(link);
+      fecharModalContato();
+    }
+
+    // ═══ CRUD ANYDESK ═════════════════════════════════════
+    function abrirModalAnyDesk(id) {
+      linkEditandoId = id || null;
+      document.getElementById('label-contato-numero').textContent = 'Código AnyDesk';
+      document.getElementById('grupo-contato-localidade').style.display = 'none';
+      const inputNum = document.getElementById('campo-contato-telefone');
+      inputNum.type = 'text';
+      inputNum.placeholder = '110 334 4980';
+      if (id) {
+        const link = links.find(l => l.id === id);
+        if (!link) return;
+        document.getElementById('modal-contato-titulo').textContent = 'Editar AnyDesk';
+        document.getElementById('campo-contato-nome').value = link.nome || '';
+        document.getElementById('campo-contato-empresa').value = link.empresa || '';
+        document.getElementById('campo-contato-telefone').value = link.telefone || '';
+      } else {
+        document.getElementById('modal-contato-titulo').textContent = 'Novo AnyDesk';
+        document.getElementById('campo-contato-nome').value = '';
+        document.getElementById('campo-contato-empresa').value = '';
+        document.getElementById('campo-contato-telefone').value = '';
+      }
+      document.getElementById('modal-contato').classList.add('active');
+      document.getElementById('campo-contato-nome').focus();
+    }
+
+    async function salvarAnyDesk() {
+      const nome = document.getElementById('campo-contato-nome').value.trim();
+      const empresa = document.getElementById('campo-contato-empresa').value.trim();
+      const codigo = document.getElementById('campo-contato-telefone').value.trim();
+
+      if (!nome) { alert('Informe o nome.'); return; }
+      if (!codigo) { alert('Informe o código AnyDesk.'); return; }
+
+      const categoriaId = catAtiva || idCategoriaAnyDesk() || 'contatos';
+
+      let link;
+      if (linkEditandoId) {
+        const idx = links.findIndex(l => l.id === linkEditandoId);
+        if (idx !== -1) link = { ...links[idx], nome, empresa, telefone: codigo, categoriaId, tipo: 'anydesk' };
+      } else {
+        link = { id: gerarId(), nome, empresa, telefone: codigo, categoriaId, tipo: 'anydesk' };
+      }
+
+      if (link) await salvarLinkFirestore(link);
+      fecharModalContato();
+    }
+
+    // ═══ CRUD TOTEM ══════════════════════════════════════
+    function abrirModalTotem(id) {
+      linkEditandoId = id || null;
+      document.getElementById('label-contato-numero').textContent = 'Código do Totem';
+      document.getElementById('grupo-contato-localidade').style.display = 'block';
+      const inputNum = document.getElementById('campo-contato-telefone');
+      inputNum.type = 'text';
+      inputNum.placeholder = 'Ex: 79';
+      if (id) {
+        const link = links.find(l => l.id === id);
+        if (!link) return;
+        document.getElementById('modal-contato-titulo').textContent = 'Editar Totem';
+        document.getElementById('campo-contato-nome').value = link.nome || '';
+        document.getElementById('campo-contato-empresa').value = link.empresa || '';
+        document.getElementById('campo-contato-localidade').value = link.localidade || '';
+        document.getElementById('campo-contato-telefone').value = link.telefone || '';
+      } else {
+        document.getElementById('modal-contato-titulo').textContent = 'Novo Totem';
+        document.getElementById('campo-contato-nome').value = '';
+        document.getElementById('campo-contato-empresa').value = '';
+        document.getElementById('campo-contato-localidade').value = '';
+        document.getElementById('campo-contato-telefone').value = '';
+      }
+      document.getElementById('modal-contato').classList.add('active');
+      document.getElementById('campo-contato-nome').focus();
+    }
+
+    async function salvarTotem() {
+      const nome = document.getElementById('campo-contato-nome').value.trim();
+      const empresa = document.getElementById('campo-contato-empresa').value.trim();
+      const localidade = document.getElementById('campo-contato-localidade').value.trim();
+      const codigo = document.getElementById('campo-contato-telefone').value.trim();
+
+      if (!nome) { alert('Informe o nome/dispositivo do totem.'); return; }
+      if (!codigo) { alert('Informe o código do totem.'); return; }
+
+      const categoriaId = catAtiva || idCategoriaTotem() || 'contatos';
+
+      let link;
+      if (linkEditandoId) {
+        const idx = links.findIndex(l => l.id === linkEditandoId);
+        if (idx !== -1) link = { ...links[idx], nome, empresa, localidade, telefone: codigo, categoriaId, tipo: 'totem' };
+      } else {
+        link = { id: gerarId(), nome, empresa, localidade, telefone: codigo, categoriaId, tipo: 'totem' };
+      }
+
+      if (link) await salvarLinkFirestore(link);
+      fecharModalContato();
+    }
+
+    // ═══ CRUD LINKS ═══════════════════════════════════════
+    function abrirModalLink(id) {
+      linkEditandoId = id || null;
+      preencherSelectCategorias();
+      if (id) {
+        const link = links.find(l => l.id === id);
+        if (!link) return;
+        document.getElementById('modal-link-titulo').textContent = 'Editar Link';
+        document.getElementById('campo-link-nome').value = link.nome;
+        document.getElementById('campo-link-categoria').value = link.categoriaId || '';
+        document.getElementById('campo-link-url').value = link.url || '';
+        document.getElementById('campo-link-urlbase').value = link.urlBase || '';
+        document.getElementById('campo-link-identificador').value = link.identificador || '';
+        alternarTipoLink(link.tipo || 'normal');
+      } else {
+        document.getElementById('modal-link-titulo').textContent = 'Novo Link';
+        document.getElementById('campo-link-nome').value = '';
+        document.getElementById('campo-link-url').value = '';
+        document.getElementById('campo-link-urlbase').value = '';
+        document.getElementById('campo-link-identificador').value = '';
+        alternarTipoLink('normal');
+        if (catAtiva) document.getElementById('campo-link-categoria').value = catAtiva;
+      }
+      atualizarPreviewEcommerce();
+      document.getElementById('modal-link').classList.add('active');
+      document.getElementById('campo-link-nome').focus();
+    }
+
+    function fecharModalLink() { document.getElementById('modal-link').classList.remove('active'); linkEditandoId = null; }
+
+    function preencherSelectCategorias() {
+      const select = document.getElementById('campo-link-categoria');
+      select.innerHTML = '<option value="">Selecione...</option>';
+      linkCategorias.forEach(cat => {
+        select.innerHTML += `<option value="${cat.id}">${cat.icone} ${escapeHtml(cat.nome)}</option>`;
+      });
+    }
+
+    function alternarTipoLink(tipo, btn) {
+      linkTipoAtual = tipo;
+      document.querySelectorAll('.link-type-toggle button').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      else {
+        document.querySelectorAll('.link-type-toggle button').forEach(b => {
+          if ((tipo === 'normal' && b.textContent.includes('normal')) || (tipo === 'ecommerce' && b.textContent.includes('Ecommerce'))) b.classList.add('active');
+        });
+      }
+      document.getElementById('campo-link-url-group').style.display = tipo === 'ecommerce' ? 'none' : '';
+      document.getElementById('ecommerce-fields').classList.toggle('visible', tipo === 'ecommerce');
+    }
+
+    function atualizarPreviewEcommerce() {
+      const base = document.getElementById('campo-link-urlbase').value;
+      const id = document.getElementById('campo-link-identificador').value;
+      document.getElementById('ecommerce-preview').textContent = (base || id) ? (base.replace(/\/$/, '') + '/' + (id || '')) : '—';
+    }
+
+    async function salvarLink() {
+      const nome = document.getElementById('campo-link-nome').value.trim();
+      const categoriaId = document.getElementById('campo-link-categoria').value || null;
+      const tipo = linkTipoAtual;
+      const url = document.getElementById('campo-link-url').value.trim();
+      const urlBase = document.getElementById('campo-link-urlbase').value.trim();
+      const identificador = document.getElementById('campo-link-identificador').value.trim();
+
+      if (!nome) { alert('Informe o nome do link.'); return; }
+      if (tipo === 'normal' && !url) { alert('Informe a URL.'); return; }
+      if (tipo === 'ecommerce' && !urlBase) { alert('Informe a URL base.'); return; }
+
+      let link;
+      if (linkEditandoId) {
+        const idx = links.findIndex(l => l.id === linkEditandoId);
+        if (idx !== -1) link = { ...links[idx], nome, categoriaId, tipo, url, urlBase, identificador };
+      } else {
+        link = { id: gerarId(), nome, categoriaId, tipo, url, urlBase, identificador };
+      }
+
+      if (link) await salvarLinkFirestore(link);
+      fecharModalLink();
+    }
+
+    function editarLink(id) {
+      const link = links.find(l => l.id === id);
+      if (link && link.tipo === 'contato') abrirModalContato(id);
+      else if (link && link.tipo === 'anydesk') abrirModalAnyDesk(id);
+      else if (link && link.tipo === 'totem') abrirModalTotem(id);
+      else abrirModalLink(id);
+    }
+
+    async function excluirLink(id) {
+      if (!confirm('Excluir este link?')) return;
+      await excluirLinkFirestore(id);
+    }
+
+    // ═══ EXPORTAR / IMPORTAR ══════════════════════════════
+    async function exportarDados() {
+      setSyncStatus('syncing');
+      const uid = usuarioAtual ? usuarioAtual.uid : '';
+      try {
+        const [snapCasos, snapLinks, snapCats, snapChamados, snapAnotacoes, snapSenhas] = await Promise.all([
+          db.collection('casos').get(),
+          db.collection('links').get(),
+          db.collection('config').doc('categorias').get(),
+          // Chamados e anotacoes sao pessoais: as regras so deixam ler as minhas.
+          db.collection('chamados').where('ownerUid', '==', uid).get(),
+          db.collection('anotacoes').where('ownerUid', '==', uid).get(),
+          db.collection('blocos_fixos').doc('senhas').get()
+        ]);
+        const dados = {
+          versao: 2,
+          exportadoEm: new Date().toISOString(),
+          casos: snapCasos.docs.map(d => ({ id: d.id, ...d.data() })),
+          links: snapLinks.docs.map(d => ({ id: d.id, ...d.data() })),
+          linkCategorias: (snapCats.exists && Array.isArray(snapCats.data().lista)) ? snapCats.data().lista : linkCategorias,
+          chamados: snapChamados.docs.map(d => ({ id: d.id, ...d.data() })),
+          anotacoes: snapAnotacoes.docs.map(d => ({ id: d.id, ...d.data() })),
+          senhas: (snapSenhas.exists && Array.isArray(snapSenhas.data().itens)) ? snapSenhas.data().itens : []
+        };
+        const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `aurora-desk-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setSyncStatus('online');
+        showToast(`Backup baixado: ${dados.casos.length} caso(s), ${dados.links.length} link(s), ${dados.chamados.length} chamado(s), ${dados.anotacoes.length} dia(s), ${dados.senhas.length} senha(s).`);
+        return true;
+      } catch (e) {
+        console.error('Erro ao exportar:', e);
+        setSyncStatus('online');
+        showToast('Erro ao gerar o backup: ' + (e && e.message ? e.message : e));
+        return false;
+      }
+    }
+
+    async function gravarEmLotes(colecao, docs) {
+      const validos = docs.filter(d => d && d.id);
+      const ignorados = docs.length - validos.length;
+      if (ignorados > 0) console.warn(`Importação ignorou ${ignorados} registro(s) de "${colecao}" sem id.`);
+      for (let i = 0; i < validos.length; i += 500) {
+        const lote = db.batch();
+        validos.slice(i, i + 500).forEach(d => lote.set(db.collection(colecao).doc(d.id), d));
+        await lote.commit();
+      }
+      return validos.length;
+    }
+
+    async function importarDados(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      event.target.value = '';
+
+      if (!confirm('Antes de importar, um backup dos dados atuais será baixado. Continuar?')) return;
+      await exportarDados();
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        setSyncStatus('syncing');
+        try {
+          const parsed = JSON.parse(e.target.result);
+          const legado = Array.isArray(parsed);
+          const novos = {
+            casos: legado ? parsed : (parsed.casos || []),
+            links: legado ? [] : (parsed.links || []),
+            linkCategorias: legado ? [] : (parsed.linkCategorias || []),
+            chamados: legado ? [] : (parsed.chamados || []),
+            anotacoes: legado ? [] : (parsed.anotacoes || []),
+            senhas: legado ? [] : (parsed.senhas || [])
+          };
+
+          const opcao = prompt(
+            'Encontrados: ' +
+            `${novos.casos.length} caso(s), ${novos.links.length} link(s), ${novos.linkCategorias.length} categoria(s), ` +
+            `${novos.chamados.length} chamado(s), ${novos.anotacoes.length} dia(s) de anotações, ${novos.senhas.length} senha(s).\n\n` +
+            '1 = SOBRESCRIVER (grava os registros do arquivo por cima dos existentes)\n' +
+            '2 = ADICIONAR (grava só o que ainda não existe)'
+          );
+          if (opcao !== '1' && opcao !== '2') { alert('Operação cancelada.'); setSyncStatus('online'); return; }
+          const substituir = opcao === '1';
+
+          const uid = usuarioAtual ? usuarioAtual.uid : '';
+          // Regras: so posso gravar anotacoes e chamados que sao meus. Os sem dono
+          // (legados) recebem o meu uid ao serem restaurados.
+          const meusChamados = novos.chamados.filter(c => c && (!c.ownerUid || c.ownerUid === uid));
+          const minhasAnotacoes = novos.anotacoes.filter(a => a && (!a.ownerUid || a.ownerUid === uid));
+          const ignorados = (novos.chamados.length - meusChamados.length) + (novos.anotacoes.length - minhasAnotacoes.length);
+          meusChamados.forEach(c => { c.ownerUid = uid; });
+          minhasAnotacoes.forEach(a => { a.ownerUid = uid; });
+
+          const nCasos = await gravarEmLotes('casos', novos.casos);
+          const nLinks = await gravarEmLotes('links', novos.links);
+
+          let nChamados = 0, nAnotacoes = 0;
+          if (substituir) {
+            nChamados = await gravarEmLotes('chamados', meusChamados);
+            nAnotacoes = await gravarEmLotes('anotacoes', minhasAnotacoes);
+          } else {
+            const exCham = new Set((await db.collection('chamados').where('ownerUid', '==', uid).get()).docs.map(d => d.id));
+            const exAnotSnap = await db.collection('anotacoes').where('ownerUid', '==', uid).get();
+            const exAnot = new Set(exAnotSnap.docs.map(d => d.id));
+            nChamados = await gravarEmLotes('chamados', meusChamados.filter(c => !exCham.has(c.id)));
+            nAnotacoes = await gravarEmLotes('anotacoes', minhasAnotacoes.filter(a => !exAnot.has(a.id)));
+          }
+
+          if (novos.linkCategorias.length > 0) {
+            if (substituir) {
+              await db.collection('config').doc('categorias').set({ lista: novos.linkCategorias });
+            } else {
+              novos.linkCategorias.forEach(nc => { if (!linkCategorias.find(c => c.id === nc.id)) linkCategorias.push(nc); });
+              await salvarCategoriasFirestore();
+            }
+          }
+
+          let nSenhas = 0;
+          if (novos.senhas.length > 0) {
+            if (substituir) {
+              await db.collection('blocos_fixos').doc('senhas').set({ itens: novos.senhas });
+              nSenhas = novos.senhas.length;
+            } else {
+              const snap = await db.collection('blocos_fixos').doc('senhas').get();
+              const atuais = (snap.exists && Array.isArray(snap.data().itens)) ? snap.data().itens : [];
+              const vistos = new Set(atuais.map(s => String(s.titulo || '').toLowerCase()));
+              const extras = novos.senhas.filter(s => !vistos.has(String(s.titulo || '').toLowerCase()));
+              if (extras.length > 0) await db.collection('blocos_fixos').doc('senhas').set({ itens: [...atuais, ...extras] });
+              nSenhas = extras.length;
+            }
+          }
+
+          setSyncStatus('online');
+          alert(
+            'Importação concluída:\n' +
+            `${nCasos} caso(s), ${nLinks} link(s), ${nChamados} chamado(s), ` +
+            `${nAnotacoes} dia(s) de anotações, ${nSenhas} senha(s)` +
+            (ignorados > 0 ? `\n\n${ignorados} registro(s) ignorado(s) por pertencerem a outros usuários.` : '')
+          );
+        } catch (err) {
+          console.error('Erro na importação:', err);
+          setSyncStatus('online');
+          alert('Erro na importação: ' + (err && err.message ? err.message : err) + '\n\nUm backup foi baixado antes de iniciar.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ═══ DADOS DE EXEMPLO ═════════════════════════════════
+    function getExemplos() {
+      return [
+        {
+          id: 'ex1', titulo: 'Impressora não imprime', categoria: 'hardware',
+          tags: ['frequente', 'resolvido'],
+          descricao: 'A impressora recebe os comandos mas não imprime. Pode ser problema de conexão, driver ou fila de impressão.',
+          passos: '1. Verificar se a impressora está ligada e com papel\n2. Verificar o cabo USB ou conexão de rede\n3. Abrir Painel > Dispositivos > Impressoras\n4. Verificar se há documentos na fila de impressão\n5. Limpar a fila: net stop spooler → apagar arquivos em C:\\Windows\\System32\\spool\\PRINTERS → net start spooler\n6. Reiniciar a impressora e testar novamente',
+          comandos: 'net stop spooler\nnet start spooler',
+          notas: 'Se for impressora de rede, verificar se o IP está correto e se a porta está aberta.',
+          imagens: [], data: new Date().toISOString()
+        },
+        {
+          id: 'ex2', titulo: 'Erro ao abrir módulo de bilhetagem', categoria: 'software',
+          tags: ['urgente', 'pendente'],
+          descricao: 'Ao tentar acessar o módulo de bilhetagem do sistema de gestão, aparece erro de conexão com o banco de dados.',
+          passos: '1. Verificar se o serviço do banco de dados está rodando\n2. Testar a conexão com o servidor de banco\n3. Verificar as credenciais no arquivo de configuração\n4. Reiniciar o serviço do sistema de gestão\n5. Se persistir, entrar em contato com o time de desenvolvimento',
+          comandos: 'net stop "Serviço do Sistema"\nnet start "Serviço do Sistema"',
+          notas: 'Verificar se houve atualização recente que pode ter alterado as configurações.',
+          imagens: [], data: new Date().toISOString()
+        },
+        {
+          id: 'ex3', titulo: 'Internet caiu no terminal', categoria: 'rede',
+          tags: ['urgente', 'frequente'],
+          descricao: 'A internet do terminal parou de funcionar. Todos os equipamentos sem acesso à rede externa.',
+          passos: '1. Verificar se o roteador está ligado e com sinal\n2. Reiniciar o roteador (desligar 30s e ligar novamente)\n3. Verificar se o modem da operadora está com sinal OK\n4. Testar com cabo direto no modem, pulando o roteador\n5. Se não resolver, ligar para a operadora informando o número do contrato',
+          comandos: 'ping 8.8.8.8\nipconfig /all',
+          notas: 'Manter o número da operadora e contrato anotado. Verificar se o contrato está ativo.',
+          imagens: [], data: new Date().toISOString()
+        },
+        {
+          id: 'ex4', titulo: 'Cadastrar novo operador no sistema', categoria: 'configuracao',
+          tags: ['resolvido'],
+          descricao: 'Passo a passo para cadastrar um novo operador/usuário no sistema de gestão do terminal.',
+          passos: '1. Acessar o painel administrativo do sistema\n2. Ir em Configurações > Usuários\n3. Clicar em "Novo Usuário"\n4. Preencher: nome, CPF, e-mail, perfil de acesso\n5. Definir senha temporária\n6. Informar ao novo operador para trocar a senha no primeiro login',
+          comandos: '',
+          notas: 'Perfis disponíveis: Admin (acesso total), Operador (acesso ao módulo de vendas), Consultor (somente consulta).',
+          imagens: [], data: new Date().toISOString()
+        }
+      ];
+    }
+
+    // ═══ GATE DE ACESSO (Firebase Auth) ═══════════════════
+    // usuarioAtual (global) é definido em app-comum.js
+
+    async function preencherUsuarioHeader(user) {
+      let nome = user.email ? user.email.split('@')[0] : 'usuário';
+      try {
+        const snap = await db.collection('usuarios').doc(user.uid).get();
+        if (snap.exists && snap.data().nome) nome = snap.data().nome;
+      } catch (e) { console.warn('Perfil não lido:', e); }
+      usuarioNome = nome;
+      renderChip();
+      document.getElementById('sync-status').style.display = '';
+      document.getElementById('btn-sair').style.display = '';
+    }
+
+    // sair() (global) vem de app-comum.js
+
+    iniciarGate('casos', user => {
+      preencherUsuarioHeader(user);
+      init();
+    });
+  </script>
+</body>
+</html>

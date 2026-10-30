@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anotações — Aurora Desk</title>
+  <link rel="shortcut icon" href="assets/favicon.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="mock-data.js"></script>
+  <script src="mock-firebase.js"></script>
+  <script src="app-comum.js"></script>
+  <style>
+    /* ═══ Tokens (:root) e reset compartilhados em estilo.css ═══ */
+    /* Tokens (:root) e reset agora vêm de estilo.css */
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══ HEADER (mesmo visual do site) ════════════════════ */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      height: var(--header-h);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header .logo { height: 38px; width: auto; object-fit: contain; flex-shrink: 0; }
+
+    /* ═══ LAYOUT ═══════════════════════════════════════════ */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Painel do calendário ────────────────────────────── */
+    .cal-panel {
+      width: 340px;
+      min-width: 300px;
+      border-right: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cal-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .cal-nav h2 { font-size: 1rem; color: var(--text); text-transform: capitalize; }
+    .cal-nav button {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+    }
+    .cal-nav button:hover { border-color: var(--accent); }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .cal-dow {
+      text-align: center;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      padding: 2px 0;
+      font-weight: 600;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
+    }
+    .cal-day:hover { border-color: var(--accent); }
+    .cal-day.empty { visibility: hidden; }
+    .cal-day.today { outline: 2px solid var(--accent); outline-offset: -2px; font-weight: 700; }
+    .cal-day.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .cal-day.tem-nota::after {
+      content: '';
+      position: absolute;
+      bottom: 2px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--tag-frequente);
+    }
+    .cal-day.selected::after { background: #fff; }
+
+    .cal-legenda {
+      display: flex;
+      gap: 14px;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .cal-legenda .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .dot-lig { background: var(--tag-pendente); }
+    .dot-reu { background: var(--tag-frequente); }
+
+    /* ── Painel do feed ──────────────────────────────────── */
+    .feed-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .feed-head {
+      padding: 14px 20px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .feed-head h1 { font-size: 1.1rem; }
+    .feed-head .sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+    .feed-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .feed-grupo { display: flex; flex-direction: column; gap: 8px; }
+    .feed-grupo-titulo {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .feed-grupo-titulo::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .nota-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--tag-pendente);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .nota-card.reuniao { border-left-color: var(--tag-frequente); }
+    .nota-card .hora {
+      background: var(--bg-input);
+      border-radius: var(--radius);
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text);
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .nota-card .texto { flex: 1; font-size: 0.9rem; white-space: pre-wrap; word-break: break-word; }
+    .nota-card .acoes { display: flex; gap: 6px; flex-shrink: 0; }
+    .nota-card .acoes button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    .nota-card .acoes button:hover { color: var(--accent); }
+
+    .feed-vazio {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 40px 0;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+
+    /* ── Formulário nova nota ────────────────────────────── */
+    .nova-nota {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .nova-nota .linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .nova-nota select, .nova-nota input[type="time"] {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      outline: none;
+      flex: 0 0 auto;
+    }
+    .nova-nota select:focus, .nova-nota input:focus { border-color: var(--accent); }
+    .nova-nota textarea {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 48px;
+      outline: none;
+      font-family: inherit;
+      width: 100%;
+    }
+    .nova-nota textarea:focus { border-color: var(--accent); }
+    .nova-nota .acoes-botao { display: flex; justify-content: flex-end; }
+
+    /* ═══ BLOCOS FIXOS (Senhas) ═══════════════════════════ */
+    .bloco-fixo {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .bloco-fixo .b-fixo-titulo {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .bloco-fixo .b-fixo-entrada {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .bloco-fixo .b-fixo-entrada input {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      outline: none;
+      font-family: inherit;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .bloco-fixo .b-fixo-entrada input:focus { border-color: var(--accent); }
+    .bloco-fixo .b-fixo-lista {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .b-fixo-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+    .b-fixo-item .hora { color: var(--text-muted); font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+    .b-fixo-item .texto { flex: 1; word-break: break-word; }
+    .b-fixo-item .mini-acoes { display: flex; gap: 4px; flex-shrink: 0; }
+    .b-fixo-item .mini-acoes button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.7rem;
+    }
+    .b-fixo-item .mini-acoes button:hover { color: var(--accent); }
+    .b-fixo-item .item-titulo { font-weight: 700; color: var(--text); margin-right: 6px; }
+    .b-fixo-item .copiar-btn { color: var(--tag-resolvido); cursor: pointer; }
+    .b-fixo-item .copiar-btn:hover { color: #fff; }
+
+    /* ═══ COMPONENTES ══════════════════════════════════════ */
+    .btn {
+      padding: 7px 14px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s, transform 0.1s;
+      display: inline-block;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+    .btn-link {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+    }
+    .btn-link:hover { border-color: var(--accent); }
+
+    .sync-status {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+      margin-left: auto;
+      font-weight: 600;
+    }
+    .sync-status.online { background: rgba(39, 174, 96, 0.15); color: var(--tag-resolvido); }
+    .sync-status.syncing { background: rgba(52, 152, 219, 0.15); color: var(--tag-pendente); }
+    .sync-status.offline { background: rgba(233, 69, 96, 0.15); color: var(--tag-urgente); }
+    .b-fixo-toast { position: fixed; bottom: 20px; right: 20px; background: var(--tag-resolvido); color: #fff; padding: 8px 16px; border-radius: var(--radius); font-size: 0.85rem; opacity: 1; transition: opacity 0.3s; z-index: 9999; pointer-events: none; }
+    /* ═══ MODAL ═══════════════════════════════════ */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9000; align-items: center; justify-content: center; }
+    .modal-overlay.ativo { display: flex; }
+    .modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: 340px; max-width: 90vw; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .modal-head h3 { margin: 0; font-size: 1rem; }
+    .modal-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; }
+    .modal-close:hover { color: var(--accent); }
+    .modal-body { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .modal-body input { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius); padding: 8px 10px; font-size: 0.85rem; outline: none; font-family: inherit; }
+    .modal-body input:focus { border-color: var(--accent); }
+    .modal-body textarea { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius); padding: 8px 10px; font-size: 0.85rem; outline: none; font-family: inherit; resize: vertical; min-height: 80px; }
+    .modal-body textarea:focus { border-color: var(--accent); }
+    .modal-foot { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ═══ BUSCA NAS ANOTAÇÕES ═════════════════════ */
+    .busca-wrap { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .busca-wrap input[type="search"] {
+      flex: 1 1 220px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-size: 0.88rem;
+      outline: none;
+      font-family: inherit;
+      min-width: 0;
+    }
+    .busca-wrap input[type="search"]:focus { border-color: var(--accent); }
+    .busca-wrap .busca-limpar { display: none; }
+    .busca-contador { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+
+    .resultado-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--tag-pendente);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .resultado-card.reuniao { border-left-color: var(--tag-frequente); }
+    .resultado-card:hover { border-color: var(--accent); background: rgba(233,69,96,0.06); }
+    .resultado-topo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .resultado-tipo {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--bg-input);
+      color: var(--text-muted);
+    }
+    .resultado-card.reuniao .resultado-tipo { color: var(--tag-frequente); }
+    .resultado-card:not(.reuniao) .resultado-tipo { color: var(--tag-pendente); }
+    .resultado-data { font-size: 0.75rem; color: var(--text-muted); }
+    .resultado-data .hora { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+    .resultado-texto { font-size: 0.88rem; white-space: pre-wrap; word-break: break-word; }
+    mark { background: var(--accent); color: #fff; border-radius: 3px; padding: 0 2px; }
+
+    @keyframes flashNota {
+      0%   { background: rgba(233,69,96,0.35); border-color: var(--accent); }
+      100% { background: var(--bg-card); border-color: var(--border); }
+    }
+    .nota-card.destaque { animation: flashNota 1.5s ease-out; border-color: var(--accent); }
+
+    @media (max-width: 700px) {
+      header { height: auto; padding: 10px 14px; row-gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="assets/logo.png" alt="Logo" class="logo">
+    <a class="btn btn-secondary" href="index.html" style="text-decoration:none;">Aurora Desk</a>
+    <a class="btn btn-secondary" href="chamados.html" style="text-decoration:none;">Chamados Ativos</a>
+    <a class="btn btn-secondary" href="ranking.html" style="text-decoration:none;">Ranking</a>
+    <button class="btn btn-secondary" onclick="exportarParaIA()" title="Baixar .md com instruções + registros de ligações para anexar na IA">Exportar p/ IA</button>
+    <button class="btn btn-secondary" onclick="exportarAnotacoes('json')" title="Baixar o dia selecionado como JSON">Exportar .json</button>
+    <span class="sync-status syncing" id="sync-status" style="display:none;" title="Usuário / conexão">● usuário</span>
+    <button class="btn btn-secondary" id="btn-sair" style="display:none;" onclick="sair()">Sair</button>
+  </header>
+
+  <div class="app-body">
+    <aside class="cal-panel">
+      <div class="cal-nav">
+        <button onclick="mesAnterior()">&lt;</button>
+        <h2 id="cal-titulo"></h2>
+        <button onclick="mesProximo()">&gt;</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-legenda">
+        <span><span class="dot dot-lig" style="background:var(--tag-pendente)"></span>Ligação</span>
+        <span><span class="dot dot-reu" style="background:var(--tag-frequente)"></span>Reunião</span>
+        <span><span class="dot" style="background:transparent; border:1px dashed var(--border);"></span>Dia com anotações</span>
+      </div>
+
+      <div class="bloco-fixo" id="bloco-senhas">
+        <div class="b-fixo-titulo">🔑 Senhas</div>
+        <div class="b-fixo-entrada">
+          <input type="text" id="senha-titulo" placeholder="Título. Ex: Wi-Fi visita" maxlength="200">
+          <input type="text" id="senha-valor" placeholder="Senha" maxlength="200">
+          <button class="btn btn-primary" id="senha-add">+ Adicionar</button>
+        </div>
+        <div class="b-fixo-lista" id="senha-lista"></div>
+      </div>
+    </aside>
+
+    <main class="feed-panel" id="feed-panel">
+      <div class="feed-head">
+        <h1 id="feed-titulo">Selecione um dia</h1>
+        <div class="sub" id="feed-sub">Clique em uma data no calendário para ver as anotações de ligação e reunião daquele dia.</div>
+        <div class="busca-wrap">
+          <input type="search" id="busca-anot" placeholder="Pesquisar nas anotações do mês..." autocomplete="off">
+          <button class="btn btn-secondary busca-limpar" id="busca-limpar" title="Limpar busca">✕ Limpar</button>
+          <span class="busca-contador" id="busca-contador"></span>
+        </div>
+      </div>
+      <div class="feed-body" id="feed-body">
+        <div class="feed-vazio">Clique em um dia no calendário.</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ═══ MODAL EDITAR SENHA ═════════════════════ -->
+  <div class="modal-overlay" id="modal-edita-senha">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Editar senha</h3>
+        <button class="modal-close" id="modal-edita-senha-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="edita-titulo" placeholder="Título" maxlength="200">
+        <input type="text" id="edita-senha" placeholder="Senha" maxlength="200">
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" id="modal-edita-senha-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="modal-edita-senha-save">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MODAL EDITAR ANOTAÇÃO ════════════════ -->
+  <div class="modal-overlay" id="modal-edita-nota">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modal-nota-titulo">Editar anotação</h3>
+        <button class="modal-close" id="modal-edita-nota-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="edita-nota-texto" placeholder="Anotação..." rows="3"></textarea>
+        <input type="time" id="edita-nota-hora">
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" id="modal-edita-nota-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="modal-edita-nota-save">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ═══ FIREBASE (config exata do site) ═════════════════════
+    // Firebase (config/init), db, auth e helpers comuns vêm de app-comum.js
+
+    // ═══ ESTADO ═════════════════════════════════════════════
+    let anoVis = new Date().getFullYear();
+    let mesVis = new Date().getMonth(); // 0-11
+    let diaSel = null;                  // 'YYYY-MM-DD'
+    let diasComNotas = {};              // dia -> true (para marcar no calendario)
+    let indiceAnotacoes = [];           // [{dia, tipo, idx, hora, texto}] — notas do mês visível (para a busca)
+    let buscaAtiva = false;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function iso(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+    // Anotações são pessoais: id do doc = "{uid}_{AAAA-MM-DD}"
+    function idDia(chave) { return (usuarioAtual ? usuarioAtual.uid : '') + '_' + chave; }
+    function hoje() {
+      const t = new Date();
+      return iso(t.getFullYear(), t.getMonth() + 1, t.getDate());
+    }
+
+    let syncEstado = 'syncing';
+    let usuarioNome = '';
+    function renderChip() {
+      const el = document.getElementById('sync-status');
+      el.className = 'sync-status ' + syncEstado;
+      el.textContent = '● ' + (usuarioNome || 'usuário');
+      el.title = 'Usuário: ' + (usuarioNome || '—') + ' — ' +
+        (syncEstado === 'online' ? 'Conectado' : syncEstado === 'syncing' ? 'Sincronizando' : 'Offline');
+    }
+    function setSync(st) {
+      syncEstado = st;
+      renderChip();
+    }
+
+    function escapa(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // ═══ CLIPBOARD (copiarTexto + fallback HTTP + toast) ═══
+    function copiarTexto(texto, msg) {
+      const aviso = msg || 'Copiado!';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(texto).then(() => showToast(aviso)).catch(() => fallbackCopiar(texto, aviso));
+      }
+      return fallbackCopiar(texto, aviso);
+    }
+    function fallbackCopiar(texto, msg) {
+      const aviso = msg || 'Copiado!';
+      const ta = document.createElement('textarea');
+      ta.value = texto; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); showToast(aviso); } catch(e) { showToast('Erro ao copiar'); }
+      document.body.removeChild(ta);
+    }
+    function showToast(msg) {
+      const t = document.createElement('div');
+      t.className = 'b-fixo-toast'; t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
+    }
+
+    // ═══ CALENDÁRIO ════════════════════════════════════════
+    function diasDoMes(ano, mes) { return new Date(ano, mes + 1, 0).getDate(); }
+    function primeiroDiaSemana(ano, mes) { return new Date(ano, mes, 1).getDay(); }
+
+    function renderCalendario() {
+      const grid = document.getElementById('cal-grid');
+      const titulo = document.getElementById('cal-titulo');
+      titulo.textContent = new Date(anoVis, mesVis, 1)
+        .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      grid.innerHTML = '';
+
+      const dows = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+      dows.forEach(d => {
+        const e = document.createElement('div');
+        e.className = 'cal-dow';
+        e.textContent = d;
+        grid.appendChild(e);
+      });
+
+      const total = diasDoMes(anoVis, mesVis);
+      const ini = primeiroDiaSemana(anoVis, mesVis);
+
+      for (let i = 0; i < ini; i++) {
+        const e = document.createElement('div');
+        e.className = 'cal-day empty';
+        grid.appendChild(e);
+      }
+
+      const hj = hoje();
+      for (let d = 1; d <= total; d++) {
+        const chave = iso(anoVis, mesVis + 1, d);
+        const e = document.createElement('div');
+        e.className = 'cal-day';
+        if (chave === hj) e.classList.add('today');
+        if (chave === diaSel) e.classList.add('selected');
+        if (diasComNotas[chave]) e.classList.add('tem-nota');
+        e.textContent = d;
+        e.title = 'Abrir anotações de ' + chave;
+        e.onclick = () => selecionarDia(chave);
+        grid.appendChild(e);
+      }
+    }
+
+    function mesAnterior() {
+      mesVis--; if (mesVis < 0) { mesVis = 11; anoVis--; }
+      carregarMes();
+    }
+    function mesProximo() {
+      mesVis++; if (mesVis > 11) { mesVis = 0; anoVis++; }
+      carregarMes();
+    }
+
+    // Busca todos os docs do mes (para pontuar o calendário + montar o índice da busca)
+    async function carregarMes() {
+      setSync('syncing');
+      diasComNotas = {};
+      indiceAnotacoes = [];
+      const uid = usuarioAtual ? usuarioAtual.uid : '';
+      try {
+        // Pessoal: carrega somente as anotações do usuário logado
+        const snap = await db.collection('anotacoes')
+          .where('ownerUid', '==', uid)
+          .get();
+        snap.forEach(doc => {
+          const d = doc.data();
+          if (!d || !d.data) return;
+          const lig = Array.isArray(d.ligacao) ? d.ligacao : [];
+          const reu = Array.isArray(d.reuniao) ? d.reuniao : [];
+          if (lig.length || reu.length) diasComNotas[d.data] = true;
+          lig.forEach((n, idx) => indiceAnotacoes.push({ dia: d.data, tipo: 'ligacao', idx, hora: n.hora || '', texto: n.texto || '' }));
+          reu.forEach((n, idx) => indiceAnotacoes.push({ dia: d.data, tipo: 'reuniao', idx, hora: n.hora || '', texto: n.texto || '' }));
+        });
+        setSync('online');
+      } catch (err) {
+        setSync('offline');
+        console.warn('Erro ao carregar dias com notas:', err);
+      }
+      renderCalendario();
+      if (diaSel) selecionarDia(diaSel, false);
+    }
+
+    // Reindexa a partir do dia em memória (após adicionar/editar/excluir nota — sem novo .get())
+    function reindexarDia(dia) {
+      indiceAnotacoes = indiceAnotacoes.filter(e => e.dia !== dia);
+      feedLigacao.forEach((n, idx) => indiceAnotacoes.push({ dia, tipo: 'ligacao', idx, hora: n.hora || '', texto: n.texto || '' }));
+      feedReuniao.forEach((n, idx) => indiceAnotacoes.push({ dia, tipo: 'reuniao', idx, hora: n.hora || '', texto: n.texto || '' }));
+    }
+
+    // ═══ FEED DO DIA ════════════════════════════════════════
+    let feedLigacao = [];
+    let feedReuniao = [];
+    let _diaOk = false;
+
+    async function selecionarDia(chave, atualizaCal = true) {
+      diaSel = chave;
+      const feedTitulo = document.getElementById('feed-titulo');
+      const partes = chave.split('-');
+      const data = new Date(partes[0], parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+      feedTitulo.textContent = chave + ' — ' + data.toLocaleDateString('pt-BR', {
+        weekday: 'long', day: 'numeric', month: 'long'
+      });
+      document.getElementById('feed-sub').textContent = 'Ligações e reuniões do dia.';
+      if (atualizaCal) renderCalendario();
+
+      feedLigacao = [];
+      feedReuniao = [];
+      _diaOk = false;
+      setSync('syncing');
+      try {
+        const doc = await db.collection('anotacoes').doc(idDia(chave)).get();
+        if (diaSel !== chave) return;
+        if (doc.exists) {
+          const d = doc.data();
+          feedLigacao = Array.isArray(d.ligacao) ? d.ligacao : [];
+          feedReuniao = Array.isArray(d.reuniao) ? d.reuniao : [];
+        }
+        _diaOk = true;
+        setSync('online');
+      } catch (err) {
+        setSync('offline');
+        console.warn('Erro ao carregar notas do dia:', err);
+      }
+      renderFeed();
+    }
+
+    function cardNota(texto, hora, tipo, idx) {
+      const div = document.createElement('div');
+      div.className = 'nota-card' + (tipo === 'reuniao' ? ' reuniao' : '');
+      div.dataset.tipo = tipo;
+      div.dataset.idx = idx;
+      const horaEl = document.createElement('span');
+      horaEl.className = 'hora';
+      horaEl.textContent = hora || '--:--';
+      const txtEl = document.createElement('span');
+      txtEl.className = 'texto';
+      txtEl.textContent = texto;
+      const acoes = document.createElement('span');
+      acoes.className = 'acoes';
+      const btnEd = document.createElement('button');
+      btnEd.textContent = 'Editar';
+      btnEd.onclick = () => abrirEdicao(tipo, idx);
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Excluir';
+      btnDel.onclick = () => excluirNota(tipo, idx);
+      acoes.appendChild(btnEd);
+      acoes.appendChild(btnDel);
+      div.appendChild(horaEl);
+      div.appendChild(txtEl);
+      div.appendChild(acoes);
+      return div;
+    }
+
+    function grupo(tipo) {
+      const wrap = document.createElement('div');
+      wrap.className = 'feed-grupo';
+      const titulo = document.createElement('div');
+      titulo.className = 'feed-grupo-titulo';
+      titulo.textContent = tipo === 'ligacao' ? 'Ligações' : 'Reuniões';
+      wrap.appendChild(titulo);
+      const lista = tipo === 'ligacao' ? feedLigacao : feedReuniao;
+      if (!lista.length) {
+        const v = document.createElement('div');
+        v.className = 'feed-vazio';
+        v.textContent = 'Sem anotações de ' + (tipo === 'ligacao' ? 'ligação' : 'reunião') + ' neste dia.';
+        wrap.appendChild(v);
+      } else {
+        for (let i = lista.length - 1; i >= 0; i--) {
+          const n = lista[i];
+          wrap.appendChild(cardNota(n.texto, n.hora, tipo, i));
+        }
+      }
+      return wrap;
+    }
+
+    function formNovaNota() {
+      const form = document.createElement('div');
+      form.className = 'nova-nota';
+      const linha = document.createElement('div');
+      linha.className = 'linha';
+      const sel = document.createElement('select');
+      sel.id = 'novo-tipo';
+      const o1 = document.createElement('option'); o1.value = 'ligacao'; o1.textContent = 'Ligação';
+      const o2 = document.createElement('option'); o2.value = 'reuniao'; o2.textContent = 'Reunião';
+      sel.appendChild(o1); sel.appendChild(o2);
+      const hora = document.createElement('input');
+      hora.type = 'time';
+      hora.id = 'novo-hora';
+      hora.defaultValue = new Date().toTimeString().slice(0, 5);
+      const tx = document.createElement('textarea');
+      tx.id = 'novo-texto';
+      tx.placeholder = 'Escreva a anotação...';
+      tx.value = localStorage.getItem('anotacoes_rascunho_' + diaSel) || '';
+      tx.oninput = () => localStorage.setItem('anotacoes_rascunho_' + diaSel, tx.value);
+      const bar = document.createElement('div');
+      bar.className = 'acoes-botao';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary';
+      btn.textContent = '+ Adicionar';
+      btn.onclick = adicionarNota;
+      bar.appendChild(btn);
+      linha.appendChild(sel); linha.appendChild(hora);
+      form.appendChild(linha);
+      form.appendChild(tx);
+      form.appendChild(bar);
+      return form;
+    }
+
+    function renderFeed() {
+      const body = document.getElementById('feed-body');
+      body.innerHTML = '';
+      body.appendChild(formNovaNota());
+      body.appendChild(grupo('ligacao'));
+      body.appendChild(grupo('reuniao'));
+    }
+
+    // ═══ BUSCA NAS ANOTAÇÕES (mês visível) ════════════════
+    function normalizarBusca(s) {
+      return String(s == null ? '' : s)
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    }
+
+    function dataPorExtenso(dia) {
+      const p = String(dia).split('-');
+      const d = new Date(p[0], parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+      return isNaN(d) ? dia : d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    // Trecho do texto em torno da 1ª ocorrência, com o termo realçado.
+    // Usa regex sobre o texto original (preserva índices) com comparação sem acento/caixa.
+    function semAcento(s) {
+      return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+    function regexSemAcento(termo) {
+      const esc = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const mapa = { a: 'aàáâãä', e: 'eèéêë', i: 'iìíîï', o: 'oòóôõö', u: 'uùúûü', c: 'cç', n: 'nñ' };
+      const partes = esc.split('').map(ch => {
+        const low = ch.toLowerCase();
+        if (mapa[low]) {
+          const g = mapa[low] + mapa[low].toUpperCase();
+          return '[' + g + ']';
+        }
+        if (/[a-z]/i.test(ch)) return '[' + low + low.toUpperCase() + ']';
+        return ch;
+      });
+      return new RegExp(partes.join(''), 'i');
+    }
+    function trechoComDestaque(texto, termo) {
+      const re = regexSemAcento(termo);
+      const m = re.exec(texto);
+      if (!m) return escapa(texto);
+      const pos = m.index;
+      const ini = Math.max(0, pos - 40);
+      const fim = Math.min(texto.length, pos + m[0].length + 60);
+      const prefixo = ini > 0 ? '…' : '';
+      const sufixo = fim < texto.length ? '…' : '';
+      return prefixo +
+        escapa(texto.slice(ini, pos)) +
+        '<mark>' + escapa(texto.slice(pos, pos + m[0].length)) + '</mark>' +
+        escapa(texto.slice(pos + m[0].length, fim)) + sufixo;
+    }
+
+    function renderResultados(termo) {
+      const body = document.getElementById('feed-body');
+      const contador = document.getElementById('busca-contador');
+      const termos = normalizarBusca(termo).split(/\s+/).filter(Boolean);
+
+      const achados = indiceAnotacoes.filter(e => {
+        const alvo = normalizarBusca(e.texto);
+        return termos.every(t => alvo.includes(t));
+      }).sort((a, b) => {
+        if (a.dia !== b.dia) return a.dia < b.dia ? 1 : -1;
+        return (b.hora || '').localeCompare(a.hora || '');
+      });
+
+      // Feed-sub informativo
+      document.getElementById('feed-titulo').textContent = 'Resultados da busca';
+      document.getElementById('feed-sub').textContent =
+        achados.length + ' resultado(s) no mês de ' +
+        new Date(anoVis, mesVis, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) +
+        ' para "' + termo + '".';
+      contador.textContent = achados.length ? achados.length + ' resultado(s)' : 'Nenhum resultado';
+
+      body.innerHTML = '';
+      if (!achados.length) {
+        const v = document.createElement('div');
+        v.className = 'feed-vazio';
+        v.textContent = 'Nenhuma anotação deste mês contém "' + termo + '".';
+        body.appendChild(v);
+        return;
+      }
+
+      achados.forEach(e => {
+        const card = document.createElement('div');
+        card.className = 'resultado-card' + (e.tipo === 'reuniao' ? ' reuniao' : '');
+        card.title = 'Ir para ' + e.dia;
+        card.onclick = () => irParaResultado(e.dia, e.tipo, e.idx);
+
+        const topo = document.createElement('div');
+        topo.className = 'resultado-topo';
+        const tipoEl = document.createElement('span');
+        tipoEl.className = 'resultado-tipo';
+        tipoEl.textContent = e.tipo === 'reuniao' ? 'Reunião' : 'Ligação';
+        const dataEl = document.createElement('span');
+        dataEl.className = 'resultado-data';
+        dataEl.innerHTML = escapa(e.dia) + ' — ' + escapa(dataPorExtenso(e.dia)) +
+          (e.hora ? ' · <span class="hora">' + escapa(e.hora) + '</span>' : '');
+        topo.appendChild(tipoEl);
+        topo.appendChild(dataEl);
+
+        const txt = document.createElement('div');
+        txt.className = 'resultado-texto';
+        txt.innerHTML = trechoComDestaque(e.texto, termos[0] || '');
+
+        card.appendChild(topo);
+        card.appendChild(txt);
+        body.appendChild(card);
+      });
+    }
+
+    async function irParaResultado(dia, tipo, idx) {
+      // Sai do modo busca sem recarregar o dia (evita corrida com o selecionarDia abaixo)
+      buscaAtiva = false;
+      document.getElementById('busca-anot').value = '';
+      document.getElementById('busca-limpar').style.display = 'none';
+      document.getElementById('busca-contador').textContent = '';
+      // Garante que o mês do dia esteja visível
+      const p = String(dia).split('-');
+      const ano = parseInt(p[0], 10), mes = parseInt(p[1], 10) - 1;
+      if (ano !== anoVis || mes !== mesVis) {
+        anoVis = ano; mesVis = mes;
+        await carregarMes();
+      }
+      await selecionarDia(dia);
+      const card = document.querySelector('.nota-card[data-tipo="' + tipo + '"][data-idx="' + idx + '"]');
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('destaque');
+        setTimeout(() => card.classList.remove('destaque'), 1600);
+      }
+    }
+
+    function limparBusca(manterInput) {
+      buscaAtiva = false;
+      const inp = document.getElementById('busca-anot');
+      if (!manterInput) inp.value = '';
+      document.getElementById('busca-limpar').style.display = 'none';
+      document.getElementById('busca-contador').textContent = '';
+      if (diaSel) selecionarDia(diaSel, false);
+      else {
+        document.getElementById('feed-titulo').textContent = 'Selecione um dia';
+        document.getElementById('feed-sub').textContent = 'Clique em uma data no calendário para ver as anotações de ligação e reunião daquele dia.';
+        document.getElementById('feed-body').innerHTML = '<div class="feed-vazio">Clique em um dia no calendário.</div>';
+      }
+    }
+
+    let _buscaTimer = null;
+    function aoDigitarBusca() {
+      const termo = document.getElementById('busca-anot').value.trim();
+      clearTimeout(_buscaTimer);
+      _buscaTimer = setTimeout(() => {
+        if (!termo) { limparBusca(true); return; }
+        buscaAtiva = true;
+        document.getElementById('busca-limpar').style.display = '';
+        renderResultados(termo);
+      }, 150);
+    }
+
+    async function salvarDia() {
+      if (!_diaOk) {
+        alert('Não foi possível carregar as anotações deste dia. Verifique a conexão e tente novamente.');
+        return false;
+      }
+      const dados = { data: diaSel, ligacao: feedLigacao, reuniao: feedReuniao, ownerUid: usuarioAtual ? usuarioAtual.uid : null };
+      setSync('syncing');
+      try {
+        await db.collection('anotacoes').doc(idDia(diaSel)).set(dados);
+        setSync('online');
+        if (feedLigacao.length || feedReuniao.length) diasComNotas[diaSel] = true;
+        else delete diasComNotas[diaSel];
+        reindexarDia(diaSel);
+        renderCalendario();
+        return true;
+      } catch (err) {
+        setSync('offline');
+        console.warn('Erro ao salvar:', err);
+        alert('Erro ao salvar. Verifique a conexão com o Firebase.');
+        return false;
+      }
+    }
+
+    async function adicionarNota() {
+      if (!diaSel) { alert('Selecione um dia no calendário primeiro.'); return; }
+      const texto = document.getElementById('novo-texto').value.trim();
+      if (!texto) { alert('Digite o texto da anotação.'); return; }
+      const tipo = document.getElementById('novo-tipo').value;
+      const hora = document.getElementById('novo-hora').value;
+      const nota = { texto, hora };
+      if (tipo === 'ligacao') feedLigacao.push(nota); else feedReuniao.push(nota);
+      if (await salvarDia()) localStorage.removeItem('anotacoes_rascunho_' + diaSel);
+      renderFeed();
+    }
+
+    async function excluirNota(tipo, idx) {
+      const lista = tipo === 'ligacao' ? feedLigacao : feedReuniao;
+      if (!confirm('Excluir esta anotação?')) return;
+      lista.splice(idx, 1);
+      await salvarDia();
+      renderFeed();
+    }
+
+    let _notaTipo = null, _notaIdx = null;
+    function abrirEdicao(tipo, idx) {
+      const lista = tipo === 'ligacao' ? feedLigacao : feedReuniao;
+      const n = lista[idx];
+      _notaTipo = tipo; _notaIdx = idx;
+      document.getElementById('modal-nota-titulo').textContent = 'Editar ' + (tipo === 'ligacao' ? 'Ligação' : 'Reunião');
+      document.getElementById('edita-nota-texto').value = n.texto;
+      document.getElementById('edita-nota-hora').value = n.hora || '';
+      document.getElementById('modal-edita-nota').classList.add('ativo');
+    }
+    function salvarNota() {
+      const texto = document.getElementById('edita-nota-texto').value.trim();
+      const hora = document.getElementById('edita-nota-hora').value.trim();
+      if (!texto) { alert('Texto vazio — nada alterado.'); return; }
+      const lista = _notaTipo === 'ligacao' ? feedLigacao : feedReuniao;
+      lista[_notaIdx].texto = texto;
+      lista[_notaIdx].hora = hora || '--:--';
+      salvarDia().then(() => selecionarDia(diaSel, false)).then(() => fecharModalNota());
+    }
+    function fecharModalNota() {
+      document.getElementById('modal-edita-nota').classList.remove('ativo');
+      _notaTipo = null; _notaIdx = null;
+    }
+
+    // ═══ BLOCOS FIXOS (Senhas) ═════════════════════
+    const FIXOS_COLL = 'blocos_fixos';
+    let fixoSenhas = [];   // [{ titulo, senha }]
+    let _editIdx = null;
+
+    function renderSenhas(itens) {
+      const el = document.getElementById('senha-lista');
+      el.innerHTML = '';
+      if (!itens.length) { el.innerHTML = '<div class="feed-vazio">Nada cadastrado ainda.</div>'; return; }
+      for (let i = itens.length - 1; i >= 0; i--) {
+        const it = itens[i];
+        const div = document.createElement('div');
+        div.className = 'b-fixo-item';
+        const tit = document.createElement('span');
+        tit.className = 'item-titulo';
+        tit.textContent = it.titulo;
+        const ssn = document.createElement('span');
+        ssn.className = 'texto';
+        ssn.textContent = it.senha;
+        const acoes = document.createElement('span');
+        acoes.className = 'mini-acoes';
+        const bCop = document.createElement('button');
+        bCop.textContent = '📋'; bCop.title = 'Copiar senha'; bCop.className = 'copiar-btn';
+        bCop.onclick = () => copiarTexto(it.senha);
+        const bEd = document.createElement('button'); bEd.textContent='✎'; bEd.title='Editar'; bEd.onclick=()=>editarSenha(i);
+        const bDel = document.createElement('button'); bDel.textContent='✕'; bDel.title='Excluir'; bDel.onclick=()=>excluirSenha(i);
+        acoes.appendChild(bCop); acoes.appendChild(bEd); acoes.appendChild(bDel);
+        div.appendChild(tit); div.appendChild(ssn); div.appendChild(acoes);
+        el.appendChild(div);
+      }
+    }
+
+    let _senhasOk = false;
+    async function salvarSenhas() {
+      if (!_senhasOk) {
+        alert('As senhas não foram carregadas corretamente. Não é possível salvar (evita apagar a lista). Recarregue a página.');
+        return;
+      }
+      setSync('syncing');
+      try { await db.collection(FIXOS_COLL).doc('senhas').set({ itens: fixoSenhas }); setSync('online'); }
+      catch(err) { setSync('offline'); console.warn('Erro ao salvar:', err); alert('Erro ao salvar.'); }
+    }
+    async function carregarSenhas() {
+      setSync('syncing');
+      try {
+        const doc = await db.collection(FIXOS_COLL).doc('senhas').get();
+        const itens = doc.exists && Array.isArray(doc.data().itens) ? doc.data().itens : [];
+        fixoSenhas = itens; renderSenhas(fixoSenhas); _senhasOk = true; setSync('online');
+      } catch(err) {
+        _senhasOk = false;
+        setSync('offline');
+        console.warn('Erro ao carregar:', err);
+        alert('Não foi possível carregar as senhas. A lista na tela pode estar desatualizada.');
+      }
+    }
+    function adicionarSenha() {
+      const titulo = document.getElementById('senha-titulo').value.trim();
+      const senha = document.getElementById('senha-valor').value.trim();
+      if (!titulo) { alert('Digite o título.'); return; }
+      if (!senha) { alert('Digite a senha.'); return; }
+      fixoSenhas.push({ titulo, senha });
+      document.getElementById('senha-titulo').value = '';
+      document.getElementById('senha-valor').value = '';
+      renderSenhas(fixoSenhas); salvarSenhas();
+    }
+    async function excluirSenha(i) {
+      if (!confirm('Excluir esta senha?')) return;
+      fixoSenhas.splice(i, 1); renderSenhas(fixoSenhas); await salvarSenhas();
+    }
+    function editarSenha(i) {
+      const it = fixoSenhas[i];
+      document.getElementById('edita-titulo').value = it.titulo;
+      document.getElementById('edita-senha').value = it.senha;
+      document.getElementById('modal-edita-senha').classList.add('ativo');
+      _editIdx = i;
+    }
+    function salvarEdicao() {
+      const titulo = document.getElementById('edita-titulo').value.trim();
+      const senha = document.getElementById('edita-senha').value.trim();
+      if (!titulo) { alert('Título vazio.'); return; }
+      if (!senha) { alert('Senha vazia.'); return; }
+      fixoSenhas[_editIdx].titulo = titulo;
+      fixoSenhas[_editIdx].senha = senha;
+      renderSenhas(fixoSenhas); salvarSenhas();
+      fecharModalEdita();
+    }
+    function fecharModalEdita() {
+      document.getElementById('modal-edita-senha').classList.remove('ativo');
+      _editIdx = null;
+    }
+
+    // ═══ EXPORTAR ANOTAÇÕES (dia selecionado) ═════════════
+    function baixarArquivo(nome, conteudo, tipo) {
+      const blob = new Blob([conteudo], { type: tipo });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nome;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function formatarDiaTxt(dia) {
+      const partes = String(dia.data).split('-');
+      const dt = new Date(partes[0], parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+      const titulo = isNaN(dt) ? '' : ' — ' + dt.toLocaleDateString('pt-BR', {
+        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+      });
+      const linhas = [dia.data + titulo];
+      if (dia.ligacao.length) {
+        linhas.push('  Ligações:');
+        dia.ligacao.forEach(n => linhas.push('    ' + (n.hora || '--:--') + '  ' + (n.texto || '')));
+      }
+      if (dia.reuniao.length) {
+        linhas.push('  Reuniões:');
+        dia.reuniao.forEach(n => linhas.push('    ' + (n.hora || '--:--') + '  ' + (n.texto || '')));
+      }
+      return linhas.join('\n');
+    }
+
+    // ═══ EXPORTAR PARA A IA (.md com instruções + registros) ═══
+    const MENSAGEM_IA = 'Formate os registros deste arquivo seguindo as instruções.';
+    const LIMITE_IA = 60 * 1024;
+    const EXEMPLO_IA = [
+      'Proposta de Formatação dos Registros',
+      '1. 09:47 – Marina (Filial Norte)',
+      'Telefone: (55) 90000-0000',
+      '',
+      'Contato / Local: Marina – Filial Norte',
+      '',
+      'Resumo: Dificuldade no sistema',
+      '',
+      'Motivo: Dificuldade no sistema da Viação Litoral.',
+      '',
+      'Ações / Resolução: Orientado o cliente a acionar diretamente o suporte da Viação Litoral por se tratar de sistema terceiro. O cliente realizou o contato e a demanda foi resolvida.',
+      '',
+      '2. 11:49 – (51) 90000-0000',
+      'Telefone: (51) 90000-0000',
+      '',
+      'Contato / Local: Não identificado',
+      '',
+      'Resumo: Ligação interrompida',
+      '',
+      'Ocorrência: Ligação interrompida/queda na linha antes do início do atendimento.',
+      '(Veja a dúvida 1 abaixo sobre unificar ou não com o registro seguinte)'
+    ].join('\n');
+
+    const INSTRUCOES_IA = [
+      '# Instruções para a IA — Registros de ligações (Aurora Desk)',
+      '',
+      '> Como usar: anexe este arquivo no chat da IA e envie:',
+      '> "' + MENSAGEM_IA + '"',
+      '',
+      '## Papel',
+      'Você organiza registros de ligações de suporte da Aurora Desk para o canal de registros.',
+      '',
+      '## Tarefa',
+      'Leia os registros da seção "Registros" e produza a versão formatada, precisa e pronta para postar, seguindo o formato e o exemplo abaixo.',
+      '',
+      '## Regras',
+      '1. Use apenas informações presentes nos registros. Não invente nomes, telefones, cidades, horários, causas ou resultados.',
+      '2. Preserve nomes, telefones, cidades, horários, termos técnicos e números exatamente como estão.',
+      '3. Corrija ortografia, gramática e pontuação; elimine repetições e deixe a descrição objetiva.',
+      '4. Mantenha a ordem cronológica e inclua todos os registros.',
+      '5. Quando um campo não existir no registro, escreva "Não informado"; para contato não identificado, "Não identificado".',
+      '6. Se um registro estiver ambíguo ou incompleto (ex.: ligação interrompida que pode ser continuação do registro seguinte), não decida sozinho: inclua uma seção "Dúvidas" numerada no final e peça minha confirmação antes de entregar a versão final.',
+      '7. Saída em português do Brasil, em texto simples (sem asteriscos, cerquilhas ou tabelas), como no exemplo.',
+      '8. Se não houver dúvidas, não inclua a seção "Dúvidas".',
+      '9. Não copie a linha "Data:" para a saída; use-a apenas como contexto.',
+      '10. Gere um campo "Resumo:" antes de "Motivo:" (ou "Ocorrência:"). Ele deve ser uma síntese curta em uma linha (máx. ~60 caracteres), ideal para aparecer como título do registro. Não invente informações.',
+      '',
+      '## Formato de saída',
+      'Proposta de Formatação dos Registros',
+      '1. HH:MM – <Contato (Local) ou telefone>',
+      'Telefone: <telefone ou Não informado>',
+      '',
+      'Contato / Local: <nome – cidade ou Não identificado>',
+      '',
+      'Resumo: <síntese curta em uma linha>',
+      '',
+      'Motivo: <motivo>',
+      'Ações / Resolução: <ações e resultado>',
+      '',
+      '2. ...',
+      '',
+      '> Use "Ocorrência:" no lugar de "Motivo:" quando a ligação não foi concluída. Omita "Ações / Resolução" quando não houver ação.',
+      '',
+      '## Exemplo',
+      EXEMPLO_IA,
+      '',
+      '## Exemplo de dúvidas',
+      'Dúvidas',
+      '1. O registro das 11:49 é a mesma ligação do registro seguinte? Se sim, unifico os dois.'
+    ];
+
+    function formatarDataIA(chave) {
+      const p = String(chave || '').split('-').map(Number);
+      const dt = new Date(p[0], (p[1] || 1) - 1, p[2] || 1);
+      if (isNaN(dt.getTime())) return String(chave || '');
+      const dia = String(dt.getDate()).padStart(2, '0');
+      const mes = String(dt.getMonth() + 1).padStart(2, '0');
+      const semana = dt.toLocaleDateString('pt-BR', { weekday: 'long' });
+      return dia + '/' + mes + '/' + dt.getFullYear() + ' (' + semana + ')';
+    }
+
+    function montarArquivoIA(dia) {
+      const ligacoes = (Array.isArray(dia.ligacao) ? dia.ligacao : [])
+        .filter(n => n && String(n.texto || '').trim())
+        .slice()
+        .sort((a, b) => String(a.hora || '99:99').localeCompare(String(b.hora || '99:99')));
+      if (!ligacoes.length) return '';
+
+      const linhas = INSTRUCOES_IA.concat([
+        '',
+        '## Registros',
+        'Data: ' + formatarDataIA(dia.data),
+        ''
+      ]);
+      const totalPorHora = {};
+      ligacoes.forEach(n => {
+        const h = n.hora || '--:--';
+        totalPorHora[h] = (totalPorHora[h] || 0) + 1;
+      });
+      const vistos = {};
+      ligacoes.forEach(n => {
+        const h = n.hora || '--:--';
+        vistos[h] = (vistos[h] || 0) + 1;
+        linhas.push('### ' + h + (totalPorHora[h] > 1 ? ' — registro ' + vistos[h] : ''));
+        linhas.push(String(n.texto || '').trim());
+        linhas.push('');
+      });
+      return linhas.join('\n');
+    }
+
+    async function obterDiaSelecionado() {
+      if (!diaSel) { alert('Selecione um dia no calendário primeiro.'); return null; }
+      setSync('syncing');
+      try {
+        const doc = await db.collection('anotacoes').doc(idDia(diaSel)).get();
+        const v = doc.exists ? (doc.data() || {}) : {};
+        setSync('online');
+        return {
+          data: v.data || diaSel,
+          ligacao: Array.isArray(v.ligacao) ? v.ligacao : [],
+          reuniao: Array.isArray(v.reuniao) ? v.reuniao : []
+        };
+      } catch (err) {
+        console.warn('Erro ao buscar o dia para exportar:', err);
+        if (!_diaOk) {
+          setSync('offline');
+          alert('Não foi possível buscar as anotações do dia: ' + (err && err.message ? err.message : err));
+          return null;
+        }
+        setSync('offline');
+        return { data: diaSel, ligacao: feedLigacao, reuniao: feedReuniao };
+      }
+    }
+
+    async function exportarParaIA() {
+      if (!diaSel) { alert('Selecione um dia no calendário primeiro.'); return false; }
+      const dia = await obterDiaSelecionado();
+      if (!dia) return false;
+      const conteudo = montarArquivoIA(dia);
+      if (!conteudo) {
+        alert('O dia ' + diaSel + ' não tem ligações para exportar.');
+        return true;
+      }
+      baixarArquivo('registros-' + dia.data + '.md', conteudo, 'text/markdown;charset=utf-8');
+      const kb = Math.ceil(conteudo.length / 1024);
+      const aviso = conteudo.length > LIMITE_IA
+        ? 'Arquivo com ' + kb + ' KB (a IA pode demorar). Mensagem copiada! Anexe o .md na IA.'
+        : 'Mensagem copiada! Anexe o .md na IA.';
+      copiarTexto(MENSAGEM_IA, aviso);
+      return true;
+    }
+
+    async function exportarAnotacoes(formato) {
+      if (!diaSel) { alert('Selecione um dia no calendário primeiro.'); return false; }
+      const dia = await obterDiaSelecionado();
+      if (!dia) return false;
+
+      if (!dia.ligacao.length && !dia.reuniao.length) {
+        alert('O dia ' + diaSel + ' não tem anotações para exportar.');
+        return true;
+      }
+
+      if (formato === 'json') {
+        const dados = { versao: 1, exportadoEm: new Date().toISOString(), dia };
+        baixarArquivo(`anotacoes-${dia.data}.json`, JSON.stringify(dados, null, 2), 'application/json');
+      } else {
+        const cabecalho = [
+          'ANOTAÇÕES — Aurora Desk',
+          'Exportado em ' + new Date().toLocaleString('pt-BR'),
+          '='.repeat(50), ''
+        ];
+        baixarArquivo(`anotacoes-${dia.data}.txt`, '\uFEFF' + [...cabecalho, formatarDiaTxt(dia)].join('\n'), 'text/plain;charset=utf-8');
+      }
+      return true;
+    }
+
+    // ═══ INIT ═══════════════════════════════════════════════
+    document.getElementById('senha-add').onclick = adicionarSenha;
+    document.getElementById('modal-edita-senha-close').onclick = fecharModalEdita;
+    document.getElementById('modal-edita-senha-cancel').onclick = fecharModalEdita;
+    document.getElementById('modal-edita-senha-save').onclick = salvarEdicao;
+    document.getElementById('modal-edita-senha').onclick = (e) => { if (e.target === e.currentTarget) fecharModalEdita(); };
+    document.getElementById('modal-edita-nota-close').onclick = fecharModalNota;
+    document.getElementById('modal-edita-nota-cancel').onclick = fecharModalNota;
+    document.getElementById('modal-edita-nota-save').onclick = salvarNota;
+    document.getElementById('modal-edita-nota').onclick = (e) => { if (e.target === e.currentTarget) fecharModalNota(); };
+    // ═══ BUSCA ═════════════════════════════════════════════
+    document.getElementById('busca-anot').addEventListener('input', aoDigitarBusca);
+    document.getElementById('busca-limpar').onclick = () => { limparBusca(false); };
+    document.getElementById('busca-anot').addEventListener('keydown', (e) => { if (e.key === 'Escape') limparBusca(false); });
+
+    // ═══ GATE DE ACESSO (Firebase Auth) ═══════════════════
+    // usuarioAtual (global) é definido em app-comum.js
+
+    async function preencherUsuarioHeader(user) {
+      let nome = user.email ? user.email.split('@')[0] : 'usuário';
+      try {
+        const snap = await db.collection('usuarios').doc(user.uid).get();
+        if (snap.exists && snap.data().nome) nome = snap.data().nome;
+      } catch (e) { console.warn('Perfil não lido:', e); }
+      usuarioNome = nome;
+      renderChip();
+      document.getElementById('sync-status').style.display = '';
+      document.getElementById('btn-sair').style.display = '';
+    }
+
+    // sair() (global) vem de app-comum.js
+
+    iniciarGate('anotacoes', user => {
+      preencherUsuarioHeader(user);
+      renderCalendario();
+      carregarMes();
+      carregarSenhas();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ranking — Aurora Desk</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="mock-data.js"></script>
+  <script src="mock-firebase.js"></script>
+  <script src="app-comum.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══ HEADER ═══════════════════════════════════════════ */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo { height: 38px; width: auto; object-fit: contain; flex-shrink: 0; }
+    .header-titulo { font-size: 1rem; font-weight: 700; white-space: nowrap; }
+
+    .sync-status {
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .sync-status.online { background: rgba(39,174,96,0.2); color: var(--ok); }
+    .sync-status.offline { background: rgba(233,69,96,0.2); color: var(--accent); }
+    .sync-status.syncing { background: rgba(52,152,219,0.2); color: var(--pend); }
+
+    .spacer { flex: 1; }
+
+    .btn {
+      padding: 7px 14px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+
+    /* ═══ CONTEÚDO ══════════════════════════════════════════ */
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    .secao-titulo {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .secao-titulo .qtd {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      padding: 1px 9px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* ═══ RESUMO (SEUS PONTOS) ═════════════════════════════ */
+    .resumo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .resumo-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .resumo-box .rotulo { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+    .resumo-box .valor { font-size: 1.8rem; font-weight: 700; color: var(--accent); line-height: 1.2; }
+    .resumo-box .sub { font-size: 0.72rem; color: var(--text-muted); }
+
+    /* ═══ ABAS ═════════════════════════════════════════════ */
+    .abas { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .aba {
+      padding: 8px 20px;
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .aba:hover { color: var(--text); }
+    .aba.ativo { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ═══ RANKING ══════════════════════════════════════════ */
+    .rank-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .rank-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      transition: border-color 0.2s;
+    }
+    .rank-item.eu { border-color: var(--accent); background: rgba(233,69,96,0.06); }
+    .rank-item.top1 { border-left: 3px solid #f1c40f; }
+    .rank-item.top2 { border-left: 3px solid #bdc3c7; }
+    .rank-item.top3 { border-left: 3px solid #cd7f32; }
+
+    .rank-pos { width: 34px; text-align: center; font-size: 1.05rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+    .rank-nome { flex: 0 0 130px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rank-nome .eu-tag { font-size: 0.68rem; color: var(--accent); font-weight: 700; margin-left: 6px; }
+    .rank-barra-wrap { flex: 1; height: 10px; background: var(--bg-input); border-radius: 6px; overflow: hidden; min-width: 60px; }
+    .rank-barra { height: 100%; background: linear-gradient(90deg, var(--accent), #ff7a8f); border-radius: 6px; transition: width 0.4s ease; }
+    .rank-pontos { flex-shrink: 0; min-width: 68px; text-align: right; font-weight: 700; }
+    .rank-pontos .unidade { font-size: 0.7rem; font-weight: 400; color: var(--text-muted); }
+
+    .vazio {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 30px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+    }
+
+    /* ═══ REGISTROS RECENTES ═══════════════════════════════ */
+    .feed-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 0.85rem;
+    }
+    .feed-item.eu { border-left: 3px solid var(--accent); }
+    .feed-quando { flex-shrink: 0; font-size: 0.72rem; color: var(--text-muted); width: 118px; }
+    .feed-user { flex-shrink: 0; font-weight: 600; width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .feed-link {
+      flex: 1;
+      color: var(--pend);
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    .feed-link:hover { text-decoration: underline; }
+    .feed-del {
+      flex-shrink: 0;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 3px 10px;
+      font-size: 0.8rem;
+      font-family: inherit;
+    }
+    .feed-del:hover { border-color: var(--accent); }
+    .ponto-marca { flex-shrink: 0; font-size: 0.72rem; color: var(--ok); font-weight: 700; }
+
+    /* ═══ MODAL ═════════════════════════════════════════════ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 200;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+      overflow-y: auto;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal h2 { font-size: 1.15rem; }
+    .modal .dica { font-size: 0.78rem; color: var(--text-muted); }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; }
+    .form-group input {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ═══ TOAST ═════════════════════════════════════════════ */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--accent);
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: all 0.3s;
+      z-index: 400;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ═══ MOBILE ═══════════════════════════════════════════ */
+    @media (max-width: 700px) {
+      header { height: auto; }
+      .resumo-grid { grid-template-columns: 1fr; }
+      .rank-nome { flex-basis: 82px; }
+      .feed-quando { width: 100%; }
+      .feed-item { flex-wrap: wrap; }
+      .feed-user { width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="assets/logo.png" alt="Logo" class="header-logo">
+    <span class="header-titulo">Ranking</span>
+    <a class="btn btn-secondary" href="index.html">Aurora Desk</a>
+    <a class="btn btn-secondary" href="chamados.html">Chamados Ativos</a>
+    <a class="btn btn-secondary" href="anotacoes.html">Anotações</a>
+    <span class="spacer"></span>
+    <span class="sync-status syncing" id="sync-status" style="display:none;" title="Usuário / conexão">● usuário</span>
+    <button class="btn btn-secondary" id="btn-sair" style="display:none;" onclick="sair()">Sair</button>
+    <button class="btn btn-primary" onclick="abrirModalPonto()">+ Registrar chamado concluído</button>
+  </header>
+
+  <main>
+    <!-- Resumo do usuário logado -->
+    <section>
+      <div class="secao-titulo">Seus pontos</div>
+      <div class="resumo-grid">
+        <div class="resumo-box">
+          <span class="rotulo">Hoje</span>
+          <span class="valor" id="resumo-hoje">0</span>
+          <span class="sub">chamado(s) encerrado(s) hoje</span>
+        </div>
+        <div class="resumo-box">
+          <span class="rotulo">Semana</span>
+          <span class="valor" id="resumo-semana">0</span>
+          <span class="sub">desde segunda-feira</span>
+        </div>
+        <div class="resumo-box">
+          <span class="rotulo">Mês</span>
+          <span class="valor" id="resumo-mes">0</span>
+          <span class="sub">mês corrente</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Ranking -->
+    <section>
+      <div class="secao-titulo">Ranking de chamados encerrados <span class="qtd" id="qtd-ranking">0</span></div>
+      <div class="abas">
+        <button class="aba ativo" id="aba-hoje" onclick="trocarPeriodo('hoje')">Hoje</button>
+        <button class="aba" id="aba-semana" onclick="trocarPeriodo('semana')">Semana</button>
+        <button class="aba" id="aba-mes" onclick="trocarPeriodo('mes')">Mês</button>
+      </div>
+      <div class="rank-list" id="rank-list"></div>
+      <div class="vazio" id="rank-vazio" style="display:none;">Nenhum chamado encerrado neste período.</div>
+    </section>
+
+    <!-- Registros recentes -->
+    <section>
+      <div class="secao-titulo">Registros recentes <span class="qtd" id="qtd-feed">0</span></div>
+      <div class="feed-list" id="feed-list"></div>
+      <div class="vazio" id="feed-vazio" style="display:none;">Nenhum registro no mês corrente.</div>
+    </section>
+  </main>
+
+  <!-- Modal Registrar Ponto -->
+  <div class="modal-overlay" id="modal-ponto">
+    <div class="modal">
+      <h2>Registrar chamado concluído</h2>
+      <div class="dica">Cada chamado encerrado vale <strong>1 ponto</strong>. O link do chamado é obrigatório.</div>
+      <div class="form-group">
+        <label for="ponto-link">Link do chamado *</label>
+        <input type="text" id="ponto-link" placeholder="https://desk.aurora.example/chamado/12345">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="fecharModalPonto()">Cancelar</button>
+        <button class="btn btn-primary" onclick="registrarPonto()">Registrar (+1 ponto)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ═══ FIREBASE ═════════════════════════════════════════
+    // Firebase (config/init), db, auth e helpers comuns vêm de app-comum.js
+
+    // ═══ ESTADO ═══════════════════════════════════════════
+    const MEDALHAS = ['🥇', '🥈', '🥉'];
+    let registros = [];
+    let periodoAtivo = 'hoje';
+    let unsubscribe = null;
+    let usuarioNome = '';
+
+    // ═══ DATAS (fuso local) ═══════════════════════════════
+    function chaveData(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + dd;
+    }
+    function addDias(d, n) {
+      const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      x.setDate(x.getDate() + n);
+      return x;
+    }
+    function inicioSemana(d) {
+      const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const dow = (x.getDay() + 6) % 7; // 0 = segunda
+      return addDias(x, -dow);
+    }
+    function chaveHoje() { return chaveData(new Date()); }
+    function chaveSemana() { return chaveData(inicioSemana(new Date())); }
+    function chaveMes() {
+      const d = new Date();
+      return chaveData(new Date(d.getFullYear(), d.getMonth(), 1));
+    }
+    function inicioPeriodo(p) {
+      if (p === 'hoje') return chaveHoje();
+      if (p === 'semana') return chaveSemana();
+      return chaveMes();
+    }
+    function registrosDoPeriodo(p) {
+      const ini = inicioPeriodo(p);
+      return registros.filter(r => r.dia >= ini);
+    }
+
+    // ═══ STATUS DE CONEXÃO ═══════════════════════════════
+    let syncEstado = 'syncing';
+    function renderChip() {
+      const el = document.getElementById('sync-status');
+      el.className = 'sync-status ' + syncEstado;
+      el.textContent = '● ' + (usuarioNome || 'usuário');
+      el.title = 'Usuário: ' + (usuarioNome || '—') + ' — ' +
+        (syncEstado === 'online' ? 'Conectado' : syncEstado === 'syncing' ? 'Sincronizando' : 'Offline');
+    }
+    function setSyncStatus(status) {
+      syncEstado = status;
+      renderChip();
+    }
+
+    if (typeof db.enableNetwork === 'function') {
+      db.enableNetwork().then(() => setSyncStatus('online')).catch(() => setSyncStatus('offline'));
+    } else {
+      setSyncStatus('online');
+    }
+
+    // ═══ ESCUTA EM TEMPO REAL ═════════════════════════════
+    // Um único listener cobre os 3 períodos: busca do início do mês até agora.
+    function escutarConclusoes() {
+      setSyncStatus('syncing');
+      unsubscribe = db.collection('conclusoes')
+        .where('dia', '>=', chaveMes())
+        .orderBy('dia')
+        .onSnapshot(
+          snapshot => {
+            registros = [];
+            snapshot.forEach(doc => registros.push({ id: doc.id, ...doc.data() }));
+            renderTudo();
+            setSyncStatus('online');
+          },
+          error => {
+            console.error('Erro ao escutar conclusões:', error);
+            setSyncStatus('offline');
+          }
+        );
+    }
+
+    // ═══ PERSISTÊNCIA ═════════════════════════════════════
+    async function registrarPontoFirestore(doc) {
+      try {
+        await db.collection('conclusoes').add(doc);
+        return true;
+      } catch (e) {
+        console.error('Erro ao registrar ponto:', e);
+        alert('Erro ao registrar o ponto: ' + (e && e.message ? e.message : e) + '\nNada foi gravado.');
+        return false;
+      }
+    }
+
+    async function excluirPontoFirestore(id) {
+      try {
+        await db.collection('conclusoes').doc(id).delete();
+        return true;
+      } catch (e) {
+        console.error('Erro ao excluir ponto:', e);
+        alert('Erro ao excluir o registro: ' + (e && e.message ? e.message : e));
+        return false;
+      }
+    }
+
+    // ═══ UTILITÁRIOS ══════════════════════════════════════
+    // escapeHtml() (global) vem de app-comum.js
+    function normalizarUrl(url) {
+      url = String(url == null ? '' : url).trim();
+      if (!url) return '';
+      if (!/^[a-z][a-z0-9+\-.]*:\/\//i.test(url)) url = 'https://' + url;
+      try { new URL(url); return url; } catch (e) { return ''; }
+    }
+    function formatarData(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
+        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ═══ RENDER ═══════════════════════════════════════════
+    function contarPorUsuario(lista) {
+      const mapa = {};
+      lista.forEach(r => {
+        if (!r.ownerUid) return;
+        if (!mapa[r.ownerUid]) mapa[r.ownerUid] = { pontos: 0, username: r.username || '' };
+        mapa[r.ownerUid].pontos++;
+        if (r.username) mapa[r.ownerUid].username = r.username;
+      });
+      return mapa;
+    }
+
+    function renderResumo() {
+      const uid = usuarioAtual ? usuarioAtual.uid : null;
+      const contar = p => uid ? (contarPorUsuario(registrosDoPeriodo(p))[uid] || { pontos: 0 }).pontos : 0;
+      document.getElementById('resumo-hoje').textContent = contar('hoje');
+      document.getElementById('resumo-semana').textContent = contar('semana');
+      document.getElementById('resumo-mes').textContent = contar('mes');
+    }
+
+    function renderRanking() {
+      const contagem = contarPorUsuario(registrosDoPeriodo(periodoAtivo));
+      const uidAtual = usuarioAtual ? usuarioAtual.uid : null;
+      const itens = Object.keys(contagem).map(uid => ({
+        uid,
+        username: contagem[uid].username || '(sem nome)',
+        pontos: contagem[uid].pontos
+      })).sort((a, b) => {
+        if (b.pontos !== a.pontos) return b.pontos - a.pontos;
+        return a.username.localeCompare(b.username);
+      });
+
+      document.getElementById('qtd-ranking').textContent = itens.length;
+      const vazioEl = document.getElementById('rank-vazio');
+      const alvo = document.getElementById('rank-list');
+
+      if (!itens.length) {
+        alvo.innerHTML = '';
+        vazioEl.style.display = 'block';
+        return;
+      }
+      vazioEl.style.display = 'none';
+
+      const max = itens[0].pontos || 1;
+      alvo.innerHTML = itens.map((it, i) => {
+        const pos = i + 1;
+        const ehEu = it.uid === uidAtual;
+        const cls = ['rank-item'];
+        if (pos === 1) cls.push('top1');
+        if (pos === 2) cls.push('top2');
+        if (pos === 3) cls.push('top3');
+        if (ehEu) cls.push('eu');
+        const medalha = pos <= 3 ? MEDALHAS[pos - 1] : pos;
+        const largura = Math.max(6, Math.round((it.pontos / max) * 100));
+        return '<div class="' + cls.join(' ') + '">' +
+          '<div class="rank-pos">' + medalha + '</div>' +
+          '<div class="rank-nome">' + escapeHtml(it.username) + (ehEu ? '<span class="eu-tag">você</span>' : '') + '</div>' +
+          '<div class="rank-barra-wrap"><div class="rank-barra" style="width:' + largura + '%"></div></div>' +
+          '<div class="rank-pontos">' + it.pontos + ' <span class="unidade">' + (it.pontos === 1 ? 'ponto' : 'pontos') + '</span></div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderFeed() {
+      const ordenado = registros.slice().sort((a, b) => {
+        const da = a.data || a.dia || '';
+        const db = b.data || b.dia || '';
+        if (da !== db) return da < db ? 1 : -1;
+        return 0;
+      }).slice(0, 12);
+
+      document.getElementById('qtd-feed').textContent = registros.length;
+      const vazioEl = document.getElementById('feed-vazio');
+      const alvo = document.getElementById('feed-list');
+
+      if (!ordenado.length) {
+        alvo.innerHTML = '';
+        vazioEl.style.display = 'block';
+        return;
+      }
+      vazioEl.style.display = 'none';
+
+      const uidAtual = usuarioAtual ? usuarioAtual.uid : null;
+      alvo.innerHTML = ordenado.map(r => {
+        const ehMeu = r.ownerUid === uidAtual;
+        const botao = ehMeu
+          ? '<button class="feed-del" onclick="excluirRegistro(\'' + escapeHtml(r.id) + '\')" title="Remover registro">✕</button>'
+          : '<span class="ponto-marca">+1</span>';
+        return '<div class="feed-item' + (ehMeu ? ' eu' : '') + '">' +
+          '<div class="feed-quando">' + escapeHtml(formatarData(r.data)) + '</div>' +
+          '<div class="feed-user">' + escapeHtml(r.username || '(sem nome)') + '</div>' +
+          '<a class="feed-link" href="' + escapeHtml(r.link) + '" target="_blank" rel="noopener">' + escapeHtml(r.link) + '</a>' +
+          botao +
+        '</div>';
+      }).join('');
+    }
+
+    function renderTudo() {
+      renderResumo();
+      renderRanking();
+      renderFeed();
+    }
+
+    function trocarPeriodo(p) {
+      periodoAtivo = p;
+      ['hoje', 'semana', 'mes'].forEach(id => {
+        document.getElementById('aba-' + id).classList.toggle('ativo', id === p);
+      });
+      renderRanking();
+    }
+
+    // ═══ MODAL / REGISTRO MANUAL ══════════════════════════
+    function abrirModalPonto() {
+      document.getElementById('ponto-link').value = '';
+      document.getElementById('modal-ponto').classList.add('active');
+      setTimeout(() => document.getElementById('ponto-link').focus(), 50);
+    }
+    function fecharModalPonto() {
+      document.getElementById('modal-ponto').classList.remove('active');
+    }
+
+    async function registrarPonto() {
+      if (!usuarioAtual) return;
+      const link = normalizarUrl(document.getElementById('ponto-link').value);
+      if (!link) { alert('Informe o link do chamado (obrigatório).'); return; }
+      const agora = new Date();
+      const doc = {
+        ownerUid: usuarioAtual.uid,
+        username: usuarioNome || (usuarioAtual.email ? usuarioAtual.email.split('@')[0] : 'usuário'),
+        link: link,
+        dia: chaveData(agora),
+        data: agora.toISOString()
+      };
+      const ok = await registrarPontoFirestore(doc);
+      if (!ok) return;
+      fecharModalPonto();
+      showToast('Ponto registrado! +1');
+    }
+
+    async function excluirRegistro(id) {
+      if (!confirm('Remover este registro? O ponto será descontado.')) return;
+      const ok = await excluirPontoFirestore(id);
+      if (ok) showToast('Registro removido.');
+    }
+
+    // ═══ TOAST ════════════════════════════════════════════
+    function showToast(msg) {
+      const t = document.createElement('div');
+      t.className = 'toast';
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.classList.add('show'), 10);
+      setTimeout(() => {
+        t.classList.remove('show');
+        setTimeout(() => t.remove(), 300);
+      }, 2000);
+    }
+
+    // ═══ EVENTOS GLOBAIS ══════════════════════════════════
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') fecharModalPonto();
+    });
+    document.getElementById('modal-ponto').addEventListener('click', function (e) {
+      if (e.target === this) fecharModalPonto();
+    });
+    document.getElementById('ponto-link').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') registrarPonto();
+    });
+
+    // ═══ GATE DE ACESSO (Firebase Auth) ═══════════════════
+    async function preencherUsuarioHeader(user) {
+      let nome = user.email ? user.email.split('@')[0] : 'usuário';
+      try {
+        const snap = await db.collection('usuarios').doc(user.uid).get();
+        if (snap.exists && snap.data().nome) nome = snap.data().nome;
+      } catch (e) { console.warn('Perfil não lido:', e); }
+      usuarioNome = nome;
+      renderChip();
+      document.getElementById('sync-status').style.display = '';
+      document.getElementById('btn-sair').style.display = '';
+    }
+
+    // sair() (global) vem de app-comum.js
+
+    iniciarGate('ranking.html', user => {
+      preencherUsuarioHeader(user);
+      escutarConclusoes();
+    });
+  </script>
+</body>
+</html>

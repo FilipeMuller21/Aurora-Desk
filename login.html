@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aurora Desk — Login</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="estilo.css">
+  <script src="mock-data.js"></script>
+  <script src="mock-firebase.js"></script>
+  <script src="app-comum.js"></script>
+  <style>
+    /* Tokens (:root) e reset agora vêm de estilo.css */
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .login-card img.logo {
+      height: 96px;
+      display: block;
+      margin: 0 auto 8px;
+      object-fit: contain;
+    }
+
+    .login-card h1 {
+      font-size: 1.15rem;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .login-card .sub {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      margin-bottom: 22px;
+    }
+
+    .campo { margin-bottom: 14px; }
+
+    .campo label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .campo input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .campo input:focus { border-color: var(--accent); }
+
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn:hover { filter: brightness(1.1); }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+
+    .btn-entrar { width: 100%; margin-top: 6px; }
+
+    #erro {
+      display: none;
+      background: rgba(233, 69, 96, 0.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 0.83rem;
+      margin-bottom: 14px;
+      line-height: 1.4;
+    }
+
+    #aviso {
+      display: none;
+      background: rgba(52, 152, 219, 0.12);
+      border: 1px solid #3498db;
+      color: #3498db;
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 0.83rem;
+      margin-bottom: 14px;
+    }
+
+    .rodape {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .btn-demo {
+      width: 100%;
+      margin-top: 10px;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .btn-demo:hover { background: rgba(233, 69, 96, 0.12); }
+
+    .demo-info {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .demo-info b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <img class="logo" src="assets/logo.png" alt="Logo">
+    <h1>Aurora Desk — Acesso</h1>
+    <div class="sub">Entre com seu nome de usuário e o código de validação.</div>
+
+    <div id="erro"></div>
+    <div id="aviso">Acesso concluído. Redirecionando...</div>
+
+    <form id="form-login" autocomplete="off">
+      <div class="campo">
+        <label for="campo-username">Nome de usuário</label>
+        <input type="text" id="campo-username" placeholder="Ex.: joao.silva" maxlength="30"
+               autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </div>
+      <div class="campo">
+        <label for="campo-codigo">Código de validação</label>
+        <input type="password" id="campo-codigo" placeholder="••••••" maxlength="64"
+               autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-entrar" id="btn-entrar">Entrar</button>
+    </form>
+
+    <button type="button" class="btn btn-demo" id="btn-demo">Entrar na demo</button>
+    <div class="demo-info">
+      Demonstração com dados fictícios: tudo roda no navegador e volta ao
+      estado inicial a cada recarregamento. Acesso manual: <b>demo</b> / código <b>246810</b>.
+    </div>
+
+    <div class="rodape">Primeiro acesso com um nome novo? A conta é criada automaticamente com o código válido.</div>
+  </div>
+
+  <script>
+    // ═══ FIREBASE ═══════════════════════════════════════════
+    // Firebase (config/init), auth e db vêm de app-comum.js
+
+    // ═══ UTILITÁRIOS ═══════════════════════════════════════
+    function mostrarErro(msg) {
+      const el = document.getElementById('erro');
+      el.textContent = msg;
+      el.style.display = 'block';
+      document.getElementById('aviso').style.display = 'none';
+    }
+
+    function limparAvisos() {
+      document.getElementById('erro').style.display = 'none';
+      document.getElementById('aviso').style.display = 'none';
+    }
+
+    function normalizarUsername(valor) {
+      return String(valor || '').trim().toLowerCase();
+    }
+
+    function montarEmail(username) {
+      return username + '@interno.local';
+    }
+
+    // Só caminhos locais simples (evita redirect para fora do projeto)
+    function destinoSeguro() {
+      let p = new URLSearchParams(location.search).get('redirect') || '';
+      p = p.replace(/\.html$/i, '').toLowerCase();
+      if (p === 'casos') return 'index.html';
+      if (p === 'chamados') return 'chamados.html';
+      if (p === 'anotacoes') return 'anotacoes.html';
+      if (p === 'ranking') return 'ranking.html';
+      return 'index.html';
+    }
+
+    // ═══ CÓDIGOS DE CONVITE (config/convites) ══════════════
+    async function codigoValido(codigo) {
+      let snap;
+      try {
+        snap = await db.collection('config').doc('convites').get();
+      } catch (e) {
+        console.error('Erro ao ler config/convites:', e);
+        throw new Error('Não foi possível validar o código. Verifique a conexão e tente novamente.');
+      }
+      if (!snap.exists) {
+        throw new Error('Nenhum código cadastrado. Peça ao administrador criar o documento "config/convites" com o campo "codigos".');
+      }
+      const dados = snap.data() || {};
+      const codigos = Array.isArray(dados.codigos) ? dados.codigos : [];
+      const lista = codigos.map(c => String(c).trim()).filter(Boolean);
+      if (!lista.includes(String(codigo).trim())) return false;
+      return true;
+    }
+
+    // ═══ USUÁRIOS (usuarios/{uid}) ═════════════════════════
+    async function gravarUsuario(user, username, recemCriado) {
+      const ref = db.collection('usuarios').doc(user.uid);
+      const dados = {
+        uid: user.uid,
+        username,
+        ultimoAcessoEm: new Date().toISOString()
+      };
+      if (recemCriado) {
+        dados.nome = username;
+        dados.criadoEm = new Date().toISOString();
+      }
+      await ref.set(dados, { merge: true });
+    }
+
+    // ═══ LOGIN ═════════════════════════════════════════════
+    let logando = false; // evita redirect do onAuthStateChanged antes de gravar o perfil
+
+    function mensagemErroAuth(err) {
+      // Erros de regra de negócio nossos (config/convites) já vêm com texto pronto
+      if (err && !err.code && err.message) return err.message;
+      const cod = err && err.code ? err.code : '';
+      if (cod === 'auth/weak-password') return 'O código precisa ter pelo menos 6 caracteres.';
+      if (cod === 'auth/operation-not-allowed') return 'E-mail/senha não habilitado no Firebase. Ative em Authentication → Sign-in method → E-mail/senha.';
+      if (cod === 'auth/too-many-requests') return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      if (cod === 'auth/network-request-failed') return 'Falha de conexão. Verifique a internet.';
+      if (cod === 'auth/invalid-email') return 'Nome de usuário inválido.';
+      if (cod === 'auth/wrong-password' || cod === 'auth/invalid-credential' || cod === 'auth/user-not-found') {
+        return 'Usuário ou código inválido.';
+      }
+      return 'Erro ao entrar: ' + (err && err.message ? err.message : err);
+    }
+
+    async function entrar(ev) {
+      ev.preventDefault();
+      limparAvisos();
+
+      const username = normalizarUsername(document.getElementById('campo-username').value);
+      const codigo = document.getElementById('campo-codigo').value;
+
+      if (!/^[a-z0-9._-]{3,30}$/.test(username)) {
+        mostrarErro('Nome de usuário inválido (use 3-30 caracteres: letras, números, ponto, hífen ou underline).');
+        return;
+      }
+      if (!codigo) {
+        mostrarErro('Informe o código de validação.');
+        return;
+      }
+
+      const btn = document.getElementById('btn-entrar');
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+      logando = true;
+
+      try {
+        const valido = await codigoValido(codigo);
+        if (!valido) {
+          mostrarErro('Código de validação inválido.');
+          return;
+        }
+
+        const email = montarEmail(username);
+        let user = null;
+        let recemCriado = false;
+        let tentarCriarConta = false;
+        try {
+          const cred = await auth.signInWithEmailAndPassword(email, codigo);
+          user = cred.user;
+        } catch (err) {
+          const cod = err && err.code ? err.code : '';
+          // user-not-found: conta não existe. invalid-credential: projeto tem
+          // "email enumeration protection" (padrão em projetos novos) e devolve
+          // esse código para e-mail inexistente também — tratamos igual e
+          // tentamos criar; se a conta já existir, createUser devolve
+          // email-already-in-use e mostramos "usuário ou código inválido".
+          if (cod === 'auth/user-not-found' || cod === 'auth/invalid-credential') {
+            tentarCriarConta = true;
+          } else {
+            throw err;
+          }
+        }
+
+        if (tentarCriarConta) {
+          try {
+            const cred = await auth.createUserWithEmailAndPassword(email, codigo);
+            user = cred.user;
+            recemCriado = true;
+          } catch (err) {
+            const cod = err && err.code ? err.code : '';
+            if (cod === 'auth/email-already-in-use') {
+              // Conta existe (senha errada na tentativa anterior)
+              const e = new Error('Usuário ou código inválido.');
+              e.code = '';
+              throw e;
+            }
+            throw err;
+          }
+        }
+
+        // Perfil é complementar: falha aqui não bloqueia o acesso
+        try {
+          await gravarUsuario(user, username, recemCriado);
+        } catch (e) {
+          console.warn('Perfil não gravado em usuarios/' + user.uid + ':', e);
+        }
+
+        document.getElementById('aviso').style.display = 'block';
+        location.replace(destinoSeguro());
+      } catch (err) {
+        console.error('Erro no login:', err);
+        mostrarErro(mensagemErroAuth(err));
+      } finally {
+        logando = false;
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    }
+
+    // ═══ INIT ═══════════════════════════════════════════════
+    document.getElementById('form-login').addEventListener('submit', entrar);
+
+    // Acesso rápido da demo (portfólio): preenche as credenciais fictícias e envia.
+    document.getElementById('btn-demo').addEventListener('click', () => {
+      document.getElementById('campo-username').value = 'demo';
+      document.getElementById('campo-codigo').value = '246810';
+      document.getElementById('form-login').requestSubmit();
+    });
+
+    auth.onAuthStateChanged(user => {
+      if (user && !logando) location.replace(destinoSeguro());
+    });
+  </script>
+</body>
+</html>

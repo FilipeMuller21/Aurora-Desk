@@ -1,0 +1,10 @@
+# arquivos internos (logos originais, notas antigas) — não publicar
+_private/
+
+# lixo de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# backups
+*.zip
