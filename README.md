@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Aurora Desk
 
 > **EN** — A dependency-free help-desk web app (vanilla HTML/CSS/JS) for an IT support
@@ -98,3 +99,7 @@ Empresa, pessoas, telefones, domínios, projetos e credenciais deste repositóri
 ## Licença
 
 MIT — veja [LICENSE](LICENSE).
+=======
+# Aurora-Desk
+Software de organização para pessoas que atendem, vendem ou prestam suporte.
+>>>>>>> 0b773cf6d535c91ed1e77bd829e9a701622591e1
